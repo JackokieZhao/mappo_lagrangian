@@ -40,7 +40,7 @@ class MujocoRunner(Runner):
                     rnn_states_cost = self.collect(step)
 
                 # Obser reward cost and next obs
-                obs, share_obs, rewards, costs, dones, infos, _ = self.envs.step(actions)
+                obs, share_obs, rewards, costs, dones, _ = self.envs.step(actions)
 
                 dones_env = np.all(dones, axis=1)
                 reward_env = np.mean(rewards, axis=1).flatten()
@@ -55,7 +55,7 @@ class MujocoRunner(Runner):
                         done_episodes_costs.append(train_episode_costs[t])
                         train_episode_costs[t] = 0
 
-                data = obs, share_obs, rewards, costs, dones, infos, \
+                data = obs, share_obs, rewards, costs, dones, \
                     values, actions, action_log_probs, \
                     rnn_states, rnn_states_critic, cost_preds, rnn_states_cost  # fixme: it's important!!!
 
@@ -77,7 +77,7 @@ class MujocoRunner(Runner):
                 end = time.time()
                 print("\n Scenario {} Algo {} Exp {} updates {}/{} episodes, total num timesteps {}/{}, FPS {}.\n"
                       .format(self.all_args.scenario,
-                              self.algorithm_name,
+                              self.alg,
                               self.experiment_name,
                               episode,
                               episodes,
@@ -160,7 +160,7 @@ class MujocoRunner(Runner):
         return values, actions, action_log_probs, rnn_states, rnn_states_critic, cost_preds, rnn_states_cost
 
     def insert(self, data):
-        obs, share_obs, rewards, costs, dones, infos, \
+        obs, share_obs, rewards, costs, dones, \
             values, actions, action_log_probs, rnn_states, rnn_states_critic, cost_preds, rnn_states_cost = data  # fixme:!!!
         # print("insert--rewards", rewards)
         dones_env = np.all(dones, axis=1)
@@ -241,7 +241,7 @@ class MujocoRunner(Runner):
             eval_actions = np.array(eval_actions_collector).transpose(1, 0, 2)
 
             # Obser reward and next obs
-            eval_obs, eval_share_obs, eval_rewards, eval_costs, eval_dones, eval_infos, _ = self.eval_envs.step(
+            eval_obs, eval_share_obs, eval_rewards, eval_costs, eval_dones, _ = self.eval_envs.step(
                 eval_actions)
             for eval_i in range(self.n_eval_rollout_threads):
                 one_episode_rewards[eval_i].append(eval_rewards[eval_i])

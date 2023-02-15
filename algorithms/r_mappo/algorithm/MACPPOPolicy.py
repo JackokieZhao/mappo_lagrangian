@@ -83,7 +83,6 @@ class MACPPOPolicy:
             cost_preds, rnn_states_cost = self.cost_critic(cent_obs, rnn_states_cost, masks)
             return values, actions, action_log_probs, rnn_states_actor, rnn_states_critic, cost_preds, rnn_states_cost
 
-
     def get_values(self, cent_obs, rnn_states_critic, masks):
         """
         Get value function predictions.

@@ -8,25 +8,19 @@
 @Contact     :jackokie@gmail.com
 '''
 
+from collections import OrderedDict
+
+import gym
 import mat73 as mat
 import numpy as np
 import torch
-import numpy as np
-from gym import utils
-import mujoco_py as mjp
-from collections import OrderedDict
-import os
-
-
-from gym import spaces
+from gym import spaces, utils
 from gym.utils import seeding
-import numpy as np
-from os import path
-import gym
+
 from .associate import access_pilot, semvs_associate
 from .channel import channel_statistics, chl_estimate
 from .compute import compute_se_lsfd_mmse
-from .positions import gen_bs_pos, gen_ues_pos
+from .positions import gen_bs_pos
 
 
 def convert_observation_to_space(observation):
@@ -45,7 +39,7 @@ def convert_observation_to_space(observation):
     return space
 
 
-class Environment():
+class FDRAN(gym.Env, utils.EzPickle):
     def __init__(self, sce_idx, device,  env_dir='./data/env/', eps_limit=1e4, se_imp_thr=0.01, M=16, N=4,
                  K=50, N_chs=50, width=500.0, p_max=200.0, tau_p=10) -> None:
         """__init__: Initi function of the class.
@@ -141,8 +135,12 @@ class Environment():
         self._Gain_dict = torch.tensor(data['gain'])
 
     def reset(self, ):
-        """reset reset the environment.
+        """
+        The function resets the environment by generating a new set of base station positions and
+        updating the reset state.
 
+        Returns:
+          The observation of the environment.
         """
         # position reset.
         self._steps = 0
@@ -153,6 +151,12 @@ class Environment():
         return self._get_obs()
 
     def pos2idx(self, ):
+        """
+        It takes the position of the bounding box and converts it to an index.
+
+        Returns:
+          the index of the position of the bounding box.
+        """
         pos_convert = np.floor(self._bs_pos / 2)
         pos_idx = self._W_dim * pos_convert[:, 1] + pos_convert[:, 0]
         return pos_idx
@@ -181,10 +185,30 @@ class Environment():
         return ob, reward, done, self._cost
 
     def seed(self, seed=None):
+        """
+        The function takes in a seed and returns a seed
+
+        Args:
+          seed: Seed for the random number generator (if None, a random seed will be used).
+
+        Returns:
+          The seed is being returned.
+        """
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
     def check_terminate(self, acts):
+        """
+        If the sum of the actions is 0, then increment the acts_cont variable by 1. If the sum of the
+        actions is not 0, then set the acts_cont variable to 0. If the acts_cont variable is greater
+        than or equal to 3, then return True
+
+        Args:
+          acts: the actions of the agents
+
+        Returns:
+          The number of times the agent has not taken an action.
+        """
         if np.sum(acts) == 0:
             self._acts_cont += 1
         else:

@@ -26,7 +26,7 @@ def make_train_env(all_args):
                 env_args = {"scenario": all_args.scenario,
                             "agent_conf": all_args.agent_conf,
                             "agent_obsk": all_args.agent_obsk,
-                            "episode_limit": 1000}
+                            "eps_limit": 1000}
                 env = MujocoMulti(env_args=env_args)
             else:
                 print("Can not support the " + all_args.env_name + "environment.")
@@ -49,7 +49,7 @@ def make_eval_env(all_args):
                 env_args = {"scenario": all_args.scenario,
                             "agent_conf": all_args.agent_conf,
                             "agent_obsk": all_args.agent_obsk,
-                            "episode_limit": 1000}
+                            "eps_limit": 1000}
                 env = MujocoMulti(env_args=env_args)
             else:
                 print("Can not support the " + all_args.env_name + "environment.")
@@ -93,7 +93,7 @@ def main(args):
     all_args = parse_args(args, parser)
     print("mumu config: ", all_args)
 
-    if all_args.algorithm_name == "mappo_lagr":
+    if all_args.alg == "mappo_lagr":
         all_args.share_policy = False
     else:
         raise NotImplementedError
@@ -114,7 +114,7 @@ def main(args):
         torch.set_num_threads(all_args.n_training_threads)
 
     run_dir = Path(os.path.split(os.path.dirname(os.path.abspath(__file__)))[
-        0] + "/results") / all_args.env_name / all_args.scenario / all_args.algorithm_name / all_args.experiment_name
+        0] + "/results") / all_args.env_name / all_args.scenario / all_args.alg / all_args.experiment_name
     if not run_dir.exists():
         os.makedirs(str(run_dir))
 
@@ -123,7 +123,7 @@ def main(args):
                          project=all_args.env_name,
                          entity=all_args.user_name,
                          notes=socket.gethostname(),
-                         name=str(all_args.algorithm_name) + "_" +
+                         name=str(all_args.alg) + "_" +
                          str(all_args.experiment_name) +
                          "_seed" + str(all_args.seed),
                          group=all_args.map_name,
@@ -145,7 +145,7 @@ def main(args):
             os.makedirs(str(run_dir))
 
     setproctitle.setproctitle(
-        str(all_args.algorithm_name) + "-" + str(all_args.env_name) + "-" + str(all_args.experiment_name) + "@" + str(
+        str(all_args.alg) + "-" + str(all_args.env_name) + "-" + str(all_args.experiment_name) + "@" + str(
             all_args.user_name))
 
     # seed
@@ -172,7 +172,7 @@ def main(args):
         from mappo_lagrangian.runner.shared.mujoco_runner import MujocoRunner as Runner
     else:
         # in origin code not implement this method
-        if all_args.algorithm_name == "mappo_lagr":
+        if all_args.alg == "mappo_lagr":
             from mappo_lagrangian.runner.separated.mujoco_runner_mappo_lagr import MujocoRunner as Runner
         else:
             from mappo_lagrangian.runner.separated.mujoco_runner import MujocoRunner as Runner

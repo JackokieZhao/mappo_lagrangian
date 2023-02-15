@@ -16,6 +16,7 @@ class R_Actor(nn.Module):
     :param action_space: (gym.Space) action space.
     :param device: (torch.device) specifies the device to run on (cpu/gpu).
     """
+
     def __init__(self, args, obs_space, action_space, device=torch.device("cpu")):
         super(R_Actor, self).__init__()
         self.hidden_size = args.hidden_size
@@ -99,8 +100,7 @@ class R_Actor(nn.Module):
 
         action_log_probs, dist_entropy = self.act.evaluate_actions(actor_features,
                                                                    action, available_actions,
-                                                                   active_masks=
-                                                                   active_masks if self._use_policy_active_masks
+                                                                   active_masks=active_masks if self._use_policy_active_masks
                                                                    else None)
 
         return action_log_probs, dist_entropy
@@ -114,6 +114,7 @@ class R_Critic(nn.Module):
     :param cent_obs_space: (gym.Space) (centralized) observation space.
     :param device: (torch.device) specifies the device to run on (cpu/gpu).
     """
+
     def __init__(self, args, cent_obs_space, device=torch.device("cpu")):
         super(R_Critic, self).__init__()
         self.hidden_size = args.hidden_size

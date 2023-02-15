@@ -3,7 +3,7 @@ import gym
 from gym.spaces import Box
 from gym.wrappers import TimeLimit
 import numpy as np
-from .environment import Environment
+from .fdran import FDRAN
 
 # using code from https://github.com/ikostrikov/pytorch-ddpg-naf
 class NormalizedActions(gym.ActionWrapper):
@@ -38,12 +38,12 @@ class FdranMulti(object):
                                                         False)  # observe full k nearest agents (True) or just single joints (False)
 
                                 
-        self.episode_limit = env_args["episode_limit"]
+        self.eps_limit = env_args["eps_limit"]
         
         self.wrapped_env = NormalizedActions(
-            TimeLimit(Environment(**env_args), max_episode_steps=self.episode_limit))
+            TimeLimit(FDRAN(**env_args), max_episode_steps=self.eps_limit))
         self.timelimit_env = self.wrapped_env.env
-        self.timelimit_env._max_episode_steps = self.episode_limit
+        self.timelimit_env._max_episode_steps = self.eps_limit
         self.env = self.timelimit_env.env
         self.timelimit_env.reset()
         self.obs_size = n_obs
@@ -73,12 +73,12 @@ class FdranMulti(object):
         info.update(info_n)
 
         # if done_n:
-        #     if self.steps < self.episode_limit:
-        #         info["episode_limit"] = False   # the next state will be masked out
+        #     if self.steps < self.eps_limit:
+        #         info["eps_limit"] = False   # the next state will be masked out
         #     else:
-        #         info["episode_limit"] = True    # the next state will not be masked out
+        #         info["eps_limit"] = True    # the next state will not be masked out
         if done_n:
-            if self.steps < self.episode_limit:
+            if self.steps < self.eps_limit:
                 info["bad_transition"] = False  # the next state will be masked out
             else:
                 info["bad_transition"] = True  # the next state will not be masked out
@@ -161,7 +161,7 @@ class FdranMulti(object):
                     "obs_shape": self.n_obs,
                     "n_actions": self.n_actions(),
                     "n_agents": self.n_agents,
-                    "episode_limit": self.episode_limit,
+                    "eps_limit": self.eps_limit,
                     "action_spaces": self.action_space,
                     "actions_dtype": np.float32,
                     "normalise_actions": False

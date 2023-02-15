@@ -71,9 +71,9 @@ def main(args):
     parser = get_config()
     all_args = parse_args(args, parser)
 
-    if all_args.algorithm_name == "rmappo":
+    if all_args.alg == "rmappo":
         assert (all_args.use_recurrent_policy or all_args.use_naive_recurrent_policy), ("check recurrent policy!")
-    elif all_args.algorithm_name == "mappo":
+    elif all_args.alg == "mappo":
         assert (all_args.use_recurrent_policy == False and all_args.use_naive_recurrent_policy ==
                 False), ("check recurrent policy!")
     else:
@@ -97,7 +97,7 @@ def main(args):
 
     # run dir
     run_dir = Path(os.path.split(os.path.dirname(os.path.abspath(__file__)))[
-                   0] + "/results") / all_args.env_name / all_args.hanabi_name / all_args.algorithm_name / all_args.experiment_name
+                   0] + "/results") / all_args.env_name / all_args.hanabi_name / all_args.alg / all_args.experiment_name
     if not run_dir.exists():
         os.makedirs(str(run_dir))
 
@@ -107,7 +107,7 @@ def main(args):
                          project=all_args.env_name,
                          entity=all_args.user_name,
                          notes=socket.gethostname(),
-                         name=str(all_args.algorithm_name) + "_" +
+                         name=str(all_args.alg) + "_" +
                          str(all_args.experiment_name) +
                          "_seed" + str(all_args.seed),
                          group=all_args.hanabi_name,
@@ -128,7 +128,7 @@ def main(args):
         if not run_dir.exists():
             os.makedirs(str(run_dir))
 
-    setproctitle.setproctitle(str(all_args.algorithm_name) + "-" + str(
+    setproctitle.setproctitle(str(all_args.alg) + "-" + str(
         all_args.env_name) + "-" + str(all_args.experiment_name) + "@" + str(all_args.user_name))
 
     # seed

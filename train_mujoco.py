@@ -11,83 +11,32 @@ import wandb
 
 from config import get_config
 from envs.env_wrappers import ShareDummyVecEnv, ShareSubprocVecEnv
-from envs.safety_ma_mujoco import MujocoMulti
+from envs.safety_ma_mujoco.mujoco_multi import MujocoMulti
 # from envs.fd_ran.environment import Environment as MujocoMulti
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
-curPath = os.path.abspath(__file__)
-
-if len(curPath.split('/')) == 1:
-    rootPath = '\\'.join(curPath.split('\\')[:-3])
-else:
-    rootPath = '/'.join(curPath.split('/')[:-3])
-sys.path.append(os.path.split(rootPath)[0])
-
-
-def make_train_env(all_args):
+def make_env(all_args, n_thr):
     def get_env_fn(rank):
         def init_env():
-            if all_args.env_name == "mujoco":
-                env_args = {"scenario": all_args.scenario,
-                            "agent_conf": all_args.agent_conf,
-                            "agent_obsk": all_args.agent_obsk,
-                            "episode_limit": 1000}
-                env = MujocoMulti(env_args=env_args)
-            else:
-                print("Can not support the " + all_args.env_name + "environment.")
-                raise NotImplementedError
+            env = MujocoMulti(env_args=all_args)
             env.seed(all_args.seed + rank * 1000)
             return env
-
         return init_env
 
-    if all_args.n_rollout_threads == 1:
+    if n_thr == 1:
         return ShareDummyVecEnv([get_env_fn(0)])
     else:
-        return ShareSubprocVecEnv([get_env_fn(i) for i in range(all_args.n_rollout_threads)])
-
-
-def make_eval_env(all_args):
-    def get_env_fn(rank):
-        def init_env():
-            if all_args.env_name == "mujoco":
-                env_args = {"scenario": all_args.scenario,
-                            "agent_conf": all_args.agent_conf,
-                            "agent_obsk": all_args.agent_obsk,
-                            "episode_limit": 1000}
-                env = MujocoMulti(env_args=env_args)
-            else:
-                print("Can not support the " + all_args.env_name + "environment.")
-                raise NotImplementedError
-            env.seed(rank * 10000)
-            return env
-
-        return init_env
-
-    if all_args.n_eval_rollout_threads == 1:
-        return ShareDummyVecEnv([get_env_fn(0)])
-    else:
-        return ShareSubprocVecEnv([get_env_fn(i) for i in range(all_args.n_eval_rollout_threads)])
-
-
-def parse_args(args, parser):
-    parser.add_argument('--scenario', type=str, default='Ant-v2', help="Which mujoco task to run on")
-    parser.add_argument('--agent_conf', type=str, default='2x4')
-    parser.add_argument('--algo', type=str, default='mappo_lagr')
-    parser.add_argument('--agent_obsk', type=int, default=1)  # agent-specific state should be designed carefully
-    parser.add_argument("--use_single_network", action='store_true', default=False)
-    all_args = parser.parse_known_args(args)[0]
-    return all_args
+        return ShareSubprocVecEnv([get_env_fn(i) for i in range(n_thr)])
 
 
 def main(args):
     parser = get_config()
-    all_args = parse_args(args, parser)
+    all_args = parser.parse_known_args(args)[0]
     print("mumu config: ", all_args)
 
-    if all_args.algorithm_name == "mappo_lagr":
+    if all_args.alg == "mappo_lagr":
         all_args.share_policy = False
     else:
         raise NotImplementedError
@@ -108,7 +57,7 @@ def main(args):
         torch.set_num_threads(all_args.n_training_threads)
 
     run_dir = Path(os.path.split(os.path.dirname(os.path.abspath(__file__)))[
-        0] + "/results") / all_args.env_name / all_args.scenario / all_args.algorithm_name / all_args.experiment_name
+        0] + "/results") / all_args.env_name / all_args.scenario / all_args.alg / all_args.experiment_name
     if not run_dir.exists():
         os.makedirs(str(run_dir))
 
@@ -117,7 +66,7 @@ def main(args):
                          project=all_args.env_name,
                          entity=all_args.user_name,
                          notes=socket.gethostname(),
-                         name=str(all_args.algorithm_name) + "_" +
+                         name=str(all_args.alg) + "_" +
                          str(all_args.experiment_name) +
                          "_seed" + str(all_args.seed),
                          group=all_args.map_name,
@@ -139,7 +88,7 @@ def main(args):
             os.makedirs(str(run_dir))
 
     setproctitle.setproctitle(
-        str(all_args.algorithm_name) + "-" + str(all_args.env_name) + "-" + str(all_args.experiment_name) + "@" + str(
+        str(all_args.alg) + "-" + str(all_args.env_name) + "-" + str(all_args.experiment_name) + "@" + str(
             all_args.user_name))
 
     # seed
@@ -148,15 +97,14 @@ def main(args):
     np.random.seed(all_args.seed)
 
     # env
-    envs = make_train_env(all_args)
-    eval_envs = make_eval_env(all_args) if all_args.use_eval else None
-    n_agents = envs.n_agents
+    envs = make_env(all_args, all_args.n_rollout_threads)
+    eval_envs = make_env(all_args, all_args.n_eval_rollout_threads) if all_args.use_eval else None
 
     config = {
         "all_args": all_args,
         "envs": envs,
         "eval_envs": eval_envs,
-        "n_agents": n_agents,
+        "n_agents": all_args.n_agents,
         "device": device,
         "run_dir": run_dir
     }
@@ -166,7 +114,7 @@ def main(args):
         from runner.shared.mujoco_runner import MujocoRunner as Runner
     else:
         # in origin code not implement this method
-        if all_args.algorithm_name == "mappo_lagr":
+        if all_args.alg == "mappo_lagr":
             from runner.separated.mujoco_runner_mappo_lagr import \
                 MujocoRunner as Runner
         else:

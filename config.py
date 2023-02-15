@@ -8,7 +8,7 @@ def get_config():
     only used in <env>.
 
     Prepare parameters:
-        --algorithm_name <algorithm_name>
+        --alg <alg>
             specifiy the algorithm, including `["rmappo", "mappo", "rmappg", "mappg", "trpo"]`
         --experiment_name <str>
             an identifier to distinguish different experiment.
@@ -153,9 +153,13 @@ def get_config():
     """
     parser = argparse.ArgumentParser(
         description='mappo_lagrangian', formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--scenario', type=str, default='Ant-v2', help="Which mujoco task to run on")
+    parser.add_argument('--n_agents', type=int, default=2)
 
+    parser.add_argument('--agent_obsk', type=int, default=1)  # agent-specific state should be designed carefully
+    parser.add_argument("--use_single_network", action='store_true', default=False)
     # prepare parameters
-    parser.add_argument("--algorithm_name", type=str,
+    parser.add_argument("--alg", type=str,
                         default='mappo_lagr', choices=["mappo_lagr"])
 
     parser.add_argument("--experiment_name", type=str, default="check",
@@ -173,12 +177,25 @@ def get_config():
                         help="Number of parallel envs for evaluating rollouts")
     parser.add_argument("--n_render_rollout_threads", type=int, default=2,
                         help="Number of parallel envs for rendering rollouts")
-    parser.add_argument("--num_env_steps", type=int, default=5e4,
+    parser.add_argument("--num_env_steps", type=int, default=10e6,
                         help='Number of environment steps to train (default: 10e6)')
     parser.add_argument("--user_name", type=str, default='marl',
                         help="[for wandb usage], to specify user's name for simply collecting training data.")
     parser.add_argument("--use_wandb", action='store_false', default=False,
                         help="[for wandb usage], by default True, will log date to wandb server. or else will use tensorboard to log data.")
+
+    parser.add_argument("--eps_limit", type=int, default=1e3,
+                        help="The gain # of last action layer")
+    # parser.add_argument("--gain", type=float, default=0.01,
+    #                     help="The gain # of last action layer")
+    # parser.add_argument("--gain", type=float, default=0.01,
+    #                     help="The gain # of last action layer")
+    # parser.add_argument("--gain", type=float, default=0.01,
+    #                     help="The gain # of last action layer")
+    # parser.add_argument("--gain", type=float, default=0.01,
+    #                     help="The gain # of last action layer")
+    # parser.add_argument("--gain", type=float, default=0.01,
+    #                     help="The gain # of last action layer")
 
     # env parameters
     parser.add_argument("--env_name", type=str, default='mujoco', help="specify the name of environment")
@@ -191,7 +208,7 @@ def get_config():
 
     # network parameters
     parser.add_argument("--share_policy", action='store_false',
-                        default=True, help='Whether agent share the same policy')
+                        default=False, help='Whether agent share the same policy')
     parser.add_argument("--use_centralized_V", action='store_false',
                         default=True, help="Whether to use centralized V function")
     parser.add_argument("--stacked_frames", type=int, default=1,
@@ -293,15 +310,6 @@ def get_config():
     parser.add_argument("--eval_interval", type=int, default=25,
                         help="time duration between contiunous twice evaluation progress.")
     parser.add_argument("--eval_episodes", type=int, default=32, help="number of episodes of a single evaluation.")
-
-    # render parameters
-    parser.add_argument("--save_gifs", action='store_true', default=False,
-                        help="by default, do not save render video. If set, save video.")
-    parser.add_argument("--use_render", action='store_true', default=False,
-                        help="by default, do not render the env during training. If set, start render. Note: something, the environment has internal render process which is not controlled by this hyperparam.")
-    parser.add_argument("--render_episodes", type=int, default=5, help="the number of episodes to render a given env")
-    parser.add_argument("--ifi", type=float, default=0.1,
-                        help="the play interval of each rendered image in saved video.")
 
     # pretrained parameters
     parser.add_argument("--model_dir", type=str, default=None,

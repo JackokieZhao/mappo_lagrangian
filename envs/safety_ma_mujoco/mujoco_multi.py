@@ -1,9 +1,32 @@
 
 import gym
 from gym.spaces import Box
-from gym.wrappers import TimeLimit
 import numpy as np
 from .ant import AntEnv
+
+class TimeLimit(gym.Wrapper):
+    def __init__(self, env, max_episode_steps=None):
+        super(TimeLimit, self).__init__(env)
+        if max_episode_steps is None and self.env.spec is not None:
+            max_episode_steps = env.spec.max_episode_steps
+        if self.env.spec is not None:
+            self.env.spec.max_episode_steps = max_episode_steps
+        self._max_episode_steps = max_episode_steps
+        self._elapsed_steps = None
+
+    def step(self, action):
+        assert self._elapsed_steps is not None, "Cannot call env.step() before calling reset()"
+        observation, reward, cost, done = self.env.step(action)
+        self._elapsed_steps += 1
+        if self._elapsed_steps >= self._max_episode_steps:
+            done = True
+        return observation, reward, cost, done
+
+    def reset(self, **kwargs):
+        self._elapsed_steps = 0
+        return self.env.reset(**kwargs)
+
+# using code from https://github.com/ikostrikov/pytorch-ddpg-naf
 # using code from https://github.com/ikostrikov/pytorch-ddpg-naf
 class NormalizedActions(gym.ActionWrapper):
 
@@ -26,21 +49,16 @@ class NormalizedActions(gym.ActionWrapper):
 class MujocoMulti(object):
 
     def __init__(self, env_args, n_agents=2,n_actions=4, n_obs=31, **kwargs):
-        self.scenario = env_args["scenario"]  # e.g. Ant-v2
+        self.scenario = env_args.scenario  # e.g. Ant-v2
         self.n_agents = n_agents
         self.n_actions = n_actions
-        self.agent_obsk = env_args.get("agent_obsk",
-                                                 None)  # if None, fully observable else k>=0 implies observe nearest k agents or joints
-        self.agent_obsk_agents = env_args.get("agent_obsk_agents",
-                                                        False)  # observe full k nearest agents (True) or just single joints (False)
-
-                                
-        self.episode_limit = env_args["episode_limit"]
+        self.agent_obsk = env_args.agent_obsk # if None, fully observable else k>=0 implies observe nearest k agents or 
+        self.eps_limit = env_args.eps_limit
         
         self.wrapped_env = NormalizedActions(
-            TimeLimit(AntEnv(**env_args), max_episode_steps=self.episode_limit))
+            TimeLimit(AntEnv(env_args), max_episode_steps=self.eps_limit))
         self.timelimit_env = self.wrapped_env.env
-        self.timelimit_env._max_episode_steps = self.episode_limit
+        self.timelimit_env._max_episode_steps = self.eps_limit
         self.env = self.timelimit_env.env
         self.timelimit_env.reset()
         self.obs_size = n_obs
@@ -60,30 +78,14 @@ class MujocoMulti(object):
 
         # need to remove dummy actions that arise due to unequal action vector sizes across agents
         flat_actions = np.concatenate([actions[i][:self.action_space[i].low.shape[0]] for i in range(self.n_agents)])
-        obs_n, reward_n, done_n, info_n = self.wrapped_env.step(flat_actions)
+        obs_n, reward_n, cost_n, done_n = self.wrapped_env.step(flat_actions)
         self.steps += 1
-
-        info = {}
-        info.update(info_n)
-
-        # if done_n:
-        #     if self.steps < self.episode_limit:
-        #         info["episode_limit"] = False   # the next state will be masked out
-        #     else:
-        #         info["episode_limit"] = True    # the next state will not be masked out
-        if done_n:
-            if self.steps < self.episode_limit:
-                info["bad_transition"] = False  # the next state will be masked out
-            else:
-                info["bad_transition"] = True  # the next state will not be masked out
 
         # return reward_n, done_n, info
         rewards = [[reward_n]] * self.n_agents
-        # print("self.n_agents", self.n_agents)
-        info["cost"] = [[info["cost"]]] * self.n_agents
+        costs = [[cost_n]] * self.n_agents
         dones = [done_n] * self.n_agents
-        infos = [info for _ in range(self.n_agents)]
-        return self.get_obs(), self.get_state(), rewards, dones, infos, self.get_avail_actions()
+        return self.get_obs(), self.get_state(), rewards, costs, dones, self.get_avail_actions()
 
     def get_obs(self):
         """ Returns all agent observat3ions in a list """
@@ -137,7 +139,7 @@ class MujocoMulti(object):
                     "obs_shape": self.n_obs,
                     "n_actions": self.n_actions(),
                     "n_agents": self.n_agents,
-                    "episode_limit": self.episode_limit,
+                    "eps_limit": self.eps_limit,
                     "action_spaces": self.action_space,
                     "actions_dtype": np.float32,
                     "normalise_actions": False

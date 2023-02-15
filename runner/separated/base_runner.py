@@ -26,7 +26,7 @@ class Runner(object):
 
         # parameters
         self.env_name = self.all_args.env_name
-        self.algorithm_name = self.all_args.algorithm_name
+        self.alg = self.all_args.alg
         self.experiment_name = self.all_args.experiment_name
         self.use_centralized_V = self.all_args.use_centralized_V
         self.use_obs_instead_of_state = self.all_args.use_obs_instead_of_state
@@ -68,7 +68,7 @@ class Runner(object):
                 if not os.path.exists(self.save_dir):
                     os.makedirs(self.save_dir)
 
-        from mappo_lagrangian.algorithms.r_mappo.r_mappo import R_MAPPO as TrainAlgo
+        from mappo_lagrangian.algorithms.r_mappo.r_mappo import R_MAPPO as Trainalg
         from mappo_lagrangian.algorithms.r_mappo.algorithm.rMAPPOPolicy import R_MAPPOPolicy as Policy
 
         print("share_observation_space: ", self.envs.share_observation_space)
@@ -94,7 +94,7 @@ class Runner(object):
         self.buffer = []
         for agent_id in range(self.n_agents):
             # algorithm
-            tr = TrainAlgo(self.all_args, self.policy[agent_id], device=self.device)
+            tr = Trainalg(self.all_args, self.policy[agent_id], device=self.device)
             # buffer
             share_observation_space = self.envs.share_observation_space[
                 agent_id] if self.use_centralized_V else self.envs.observation_space[agent_id]

@@ -4,12 +4,12 @@ import mujoco_py as mjp
 from collections import OrderedDict
 import os
 
-
+import gym
 from gym import spaces
 from gym.utils import seeding
 import numpy as np
 from os import path
-import gym
+
 import mujoco_py
 
 
@@ -30,7 +30,7 @@ def convert_observation_to_space(observation):
 
 
 class AntEnv(gym.Env, utils.EzPickle):
-    def __init__(self, **kwargs):
+    def __init__(self, kwargs):
         model_path = 'ant.xml'
         frame_skip = 5
         utils.EzPickle.__init__(self)
@@ -94,9 +94,7 @@ class AntEnv(gym.Env, utils.EzPickle):
         done_cost = done * 1.0
         cost = np.clip(obj_cost + done_cost, 0, 1)
         ob = self._get_obs()
-        return ob, reward, done, dict(
-            cost=cost,
-        )
+        return ob, reward, done, cost
 
     def _get_obs(self):
         x = self.sim.data.qpos.flat[0]
