@@ -30,7 +30,7 @@ def gen_bs_pos(M, squareLength, rand_pos=True, min_inter_dis=0, min_edge_dis=0):
     """
     bs_pos = 1e10*torch.rand(M, dtype=torch.complex128)
 
-    if ~rand_pos:
+    if rand_pos==False:
 
        # Number of APs per dimension on the grid for cell-free and small-cell
         # setups

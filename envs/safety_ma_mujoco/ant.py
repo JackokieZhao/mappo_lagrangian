@@ -56,7 +56,7 @@ class AntEnv(gym.Env, utils.EzPickle):
             self.sim.step()
 
         mjp.functions.mj_rnePostConstraint(self.sim.model,
-                                           self.sim.data)  # calc contacts, this is a mujoco py version mismatch issue with mujoco200
+                                           self.sim.data)  # calc contactions, this is a mujoco py version mismatch issue with mujoco200
         xposafter = self.data.get_body_xpos("torso")[0]
         forward_reward = (xposafter - xposbefore) / (self.model.opt.timestep * self.frame_skip)
         ctrl_cost = .5 * np.square(actions).sum()
