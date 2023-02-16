@@ -1,8 +1,10 @@
 
 import gym
-from gym.spaces import Box
 import numpy as np
-from .ant import AntEnv
+from gym.spaces import Box
+
+from .safety_ma_mujoco.ant import AntEnv
+
 
 class TimeLimit(gym.Wrapper):
     def __init__(self, env, max_episode_steps=None):
@@ -26,8 +28,6 @@ class TimeLimit(gym.Wrapper):
         self._elapsed_steps = 0
         return self.env.reset(**kwargs)
 
-# using code from https://github.com/ikostrikov/pytorch-ddpg-naf
-# using code from https://github.com/ikostrikov/pytorch-ddpg-naf
 class NormalizedActions(gym.ActionWrapper):
 
     def _action(self, action):
@@ -48,13 +48,13 @@ class NormalizedActions(gym.ActionWrapper):
 
 class MujocoMulti(object):
 
-    def __init__(self, env_args, n_agents=2,n_actions=4, n_obs=31, **kwargs):
+    def __init__(self, env_args, n_agents=2, n_actions=4, n_obs=31, **kwargs):
         self.scenario = env_args.scenario  # e.g. Ant-v2
         self.n_agents = n_agents
         self.n_actions = n_actions
-        self.agent_obsk = env_args.agent_obsk # if None, fully observable else k>=0 implies observe nearest k agents or 
+        self.agent_obsk = env_args.agent_obsk  # if None, fully observable else k>=0 implies observe nearest k agents or
         self.eps_limit = env_args.eps_limit
-        
+
         self.wrapped_env = NormalizedActions(
             TimeLimit(AntEnv(env_args), max_episode_steps=self.eps_limit))
         self.timelimit_env = self.wrapped_env.env
@@ -71,8 +71,6 @@ class MujocoMulti(object):
         self.action_space = tuple([Box(self.env.action_space.low[:self.n_actions],
                                        self.env.action_space.high[:self.n_actions]) for a in
                                    range(self.n_agents)])
-
-
 
     def step(self, actions):
 
@@ -99,7 +97,6 @@ class MujocoMulti(object):
             obs_n.append(obs_i)
         return obs_n
 
-
     def get_state(self, team=None):
         # TODO: May want global states for different teams (so cannot see what the other team is communicating e.g.)
         state = self.env._get_obs()
@@ -116,11 +113,6 @@ class MujocoMulti(object):
     def get_avail_actions(self):  # all actions are always available
         return np.ones(shape=(self.n_agents, self.n_actions,))
 
-    def get_avail_agent_actions(self, agent_id):
-        """ Returns the available actions for agent_id """
-        return np.ones(shape=(self.n_actions,))
-
-
     def reset(self, **kwargs):
         """ Returns initial observations and states"""
         self.steps = 0
@@ -132,17 +124,3 @@ class MujocoMulti(object):
 
     def seed(self, args):
         pass
-
-    def get_env_info(self):
-
-        env_info = {"state_shape": self.n_obs,
-                    "obs_shape": self.n_obs,
-                    "n_actions": self.n_actions(),
-                    "n_agents": self.n_agents,
-                    "eps_limit": self.eps_limit,
-                    "action_spaces": self.action_space,
-                    "actions_dtype": np.float32,
-                    "normalise_actions": False
-                    }
-        return env_info
-    

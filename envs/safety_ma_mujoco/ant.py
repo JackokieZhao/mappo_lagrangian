@@ -1,16 +1,13 @@
-import numpy as np
-from gym import utils
-import mujoco_py as mjp
-from collections import OrderedDict
 import os
-
-import gym
-from gym import spaces
-from gym.utils import seeding
-import numpy as np
+from collections import OrderedDict
 from os import path
 
+import gym
 import mujoco_py
+import mujoco_py as mjp
+import numpy as np
+from gym import spaces, utils
+from gym.utils import seeding
 
 
 def convert_observation_to_space(observation):
@@ -31,11 +28,10 @@ def convert_observation_to_space(observation):
 
 class AntEnv(gym.Env, utils.EzPickle):
     def __init__(self, kwargs):
-        model_path = 'ant.xml'
         frame_skip = 5
         utils.EzPickle.__init__(self)
 
-        fullpath = os.path.join(os.path.dirname(__file__), "./assets", model_path)
+        fullpath = os.path.join(os.path.dirname(__file__), 'ant.xml')
         if not path.exists(fullpath):
             raise IOError("File %s does not exist" % fullpath)
         self.frame_skip = frame_skip
@@ -53,9 +49,9 @@ class AntEnv(gym.Env, utils.EzPickle):
                                             np.full(29, -float('inf'), dtype=np.float32))
         self.seed()
 
-    def step(self, a):
+    def step(self, actions):
         xposbefore = self.data.get_body_xpos("torso")[0]
-        self.sim.data.ctrl[:] = a
+        self.sim.data.ctrl[:] = actions
         for _ in range(self.frame_skip):
             self.sim.step()
 
@@ -63,7 +59,7 @@ class AntEnv(gym.Env, utils.EzPickle):
                                            self.sim.data)  # calc contacts, this is a mujoco py version mismatch issue with mujoco200
         xposafter = self.data.get_body_xpos("torso")[0]
         forward_reward = (xposafter - xposbefore) / (self.model.opt.timestep * self.frame_skip)
-        ctrl_cost = .5 * np.square(a).sum()
+        ctrl_cost = .5 * np.square(actions).sum()
         contact_cost = 0.5 * 1e-3 * np.sum(
             np.square(np.clip(self.sim.data.cfrc_ext, -1, 1)))
         survive_reward = 1.0
@@ -94,7 +90,7 @@ class AntEnv(gym.Env, utils.EzPickle):
         done_cost = done * 1.0
         cost = np.clip(obj_cost + done_cost, 0, 1)
         ob = self._get_obs()
-        return ob, reward, done, cost
+        return ob, reward, cost, done
 
     def _get_obs(self):
         x = self.sim.data.qpos.flat[0]

@@ -1,9 +1,11 @@
 
 import gym
+import numpy as np
 from gym.spaces import Box
 from gym.wrappers import TimeLimit
-import numpy as np
+
 from .fdran import FDRAN
+
 
 # using code from https://github.com/ikostrikov/pytorch-ddpg-naf
 class NormalizedActions(gym.ActionWrapper):

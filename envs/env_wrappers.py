@@ -1,9 +1,11 @@
 """
 Modified from OpenAI Baselines code to work with multi-agent envs
 """
-import numpy as np
-from multiprocessing import Process, Pipe
 from abc import ABC, abstractmethod
+from multiprocessing import Pipe, Process
+
+import numpy as np
+
 from mappo_lagrangian.utils.util import tile_images
 
 
@@ -404,7 +406,7 @@ def choosesimpleworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, reward, cost, done,  = env.step(data)
+            ob, reward, cost, done = env.step(data)
             remote.send((ob, cost, done))
         elif cmd == 'reset':
             ob = env.reset(data)
@@ -583,7 +585,7 @@ def chooseguardworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, reward, cost, done,  = env.step(data)
+            ob, reward, cost, done = env.step(data)
             remote.send((ob, cost, done))
         elif cmd == 'reset':
             ob = env.reset(data)

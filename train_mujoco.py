@@ -11,7 +11,8 @@ import wandb
 
 from config import get_config
 from envs.env_wrappers import ShareDummyVecEnv, ShareSubprocVecEnv
-from envs.safety_ma_mujoco.mujoco_multi import MujocoMulti
+from envs.multi_envs import MujocoMulti
+
 # from envs.fd_ran.environment import Environment as MujocoMulti
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
