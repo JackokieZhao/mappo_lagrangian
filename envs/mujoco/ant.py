@@ -97,7 +97,7 @@ class AntEnv(gym.Env, utils.EzPickle):
         return ob, ob, rewards, costs, dones
 
     def _get_obs(self):
-        
+
         x = self.sim.data.qpos.flat[0]
         y = self.sim.data.qpos.flat[1]
         if x < 20:
@@ -109,7 +109,7 @@ class AntEnv(gym.Env, utils.EzPickle):
         else:
             y_off = y - 20 * np.tan(30 / 360 * 2 * np.pi)
 
-        state =  np.concatenate([
+        state = np.concatenate([
             self.sim.data.qpos.flat[2:-42],
             self.sim.data.qvel.flat[:-36],
             [x / 5],
@@ -123,7 +123,7 @@ class AntEnv(gym.Env, utils.EzPickle):
             obs_i = (obs_i - np.mean(obs_i)) / np.std(obs_i)
             obs.append(obs_i)
         return obs
-    
+
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
