@@ -40,7 +40,7 @@ def get_config():
             [only for some env] by default False, will use global state; or else will use concatenated local obs.
 
     Replay Buffer parameters:
-        --episode_length <int>
+        --eps_limit <int>
             the max length of episode in the buffer. 
 
     Network parameters:
@@ -153,22 +153,27 @@ def get_config():
     """
     parser = argparse.ArgumentParser(
         description='mappo_lagrangian', formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--scenario', type=str, default='Ant-v2', help="Which mujoco task to run on")
-    parser.add_argument('--n_agents', type=int, default=2)
-
-    parser.add_argument('--agent_obsk', type=int, default=1)  # agent-specific state should be designed carefully
-    parser.add_argument("--use_single_network", action='store_true', default=False)
-    # prepare parameters
-    parser.add_argument("--alg", type=str,
-                        default='mappo_lagr', choices=["mappo_lagr"])
-
-    parser.add_argument("--experiment_name", type=str, default="check",
-                        help="an identifier to distinguish different experiment.")
     parser.add_argument("--seed", type=int, default=1, help="Random seed for numpy/torch")
     parser.add_argument("--cuda", action='store_false', default=False,
                         help="by default True, will use GPU to train; or else will use CPU;")
     parser.add_argument("--cuda_deterministic",
                         action='store_false', default=True, help="by default, make sure random seed effective. if set, bypass such function.")
+
+    parser.add_argument('--scenario', type=str, default='Ant-v2', help="Which mujoco task to run on")
+    parser.add_argument("--alg", type=str,
+                        default='mappo_lagr', choices=["mappo_lagr"])
+    parser.add_argument("--experiment_name", type=str, default="check",
+                        help="an identifier to distinguish different experiment.")
+    parser.add_argument("--env_name", type=str, default='mujoco', help="specify the name of environment")
+    parser.add_argument('--agent_obsk', type=int, default=1)  # agent-specific state should be designed carefully
+    parser.add_argument("--use_single_network", action='store_true', default=False)
+    parser.add_argument("--user_name", type=str, default='marl',
+                        help="[for wandb usage], to specify user's name for simply collecting training data.")
+    parser.add_argument("--use_wandb", action='store_false', default=False,
+                        help="[for wandb usage], by default True, will log date to wandb server. or else will use tensorboard to log data.")
+    parser.add_argument("--use_obs_instead_of_state", action='store_true',
+                        default=False, help="Whether to use global state or concatenated obs")
+
     parser.add_argument("--n_training_threads", type=int,
                         default=1, help="Number of torch threads for training")
     parser.add_argument("--n_rollout_threads", type=int, default=32,
@@ -177,35 +182,33 @@ def get_config():
                         help="Number of parallel envs for evaluating rollouts")
     parser.add_argument("--n_render_rollout_threads", type=int, default=2,
                         help="Number of parallel envs for rendering rollouts")
+
     parser.add_argument("--num_env_steps", type=int, default=10e6,
                         help='Number of environment steps to train (default: 10e6)')
-    parser.add_argument("--user_name", type=str, default='marl',
-                        help="[for wandb usage], to specify user's name for simply collecting training data.")
-    parser.add_argument("--use_wandb", action='store_false', default=False,
-                        help="[for wandb usage], by default True, will log date to wandb server. or else will use tensorboard to log data.")
-
-    parser.add_argument("--eps_limit", type=int, default=1e3,
+    parser.add_argument("--eps_limit", type=int, default=200,
                         help="The gain # of last action layer")
-    # parser.add_argument("--gain", type=float, default=0.01,
-    #                     help="The gain # of last action layer")
-    # parser.add_argument("--gain", type=float, default=0.01,
-    #                     help="The gain # of last action layer")
-    # parser.add_argument("--gain", type=float, default=0.01,
-    #                     help="The gain # of last action layer")
-    # parser.add_argument("--gain", type=float, default=0.01,
-    #                     help="The gain # of last action layer")
-    # parser.add_argument("--gain", type=float, default=0.01,
-    #                     help="The gain # of last action layer")
 
     # env parameters
-    parser.add_argument("--env_name", type=str, default='mujoco', help="specify the name of environment")
-    parser.add_argument("--use_obs_instead_of_state", action='store_true',
-                        default=False, help="Whether to use global state or concatenated obs")
 
-    # replay buffer parameters
-    parser.add_argument("--episode_length", type=int,
-                        default=200, help="Max length for any episode")
-
+    parser.add_argument('--n_agents', type=int, default=2)
+    parser.add_argument("--M", type=int,
+                        default=10, help="Number of base stations.")
+    parser.add_argument("--N", type=int,
+                        default=2, help="Number of ants in each base station.")
+    parser.add_argument("--K", type=int,
+                        default=50, help="Number of users")
+    parser.add_argument("--tau_p", type=int,
+                        default=10, help="Number of pilots.")
+    parser.add_argument("--n_chs", type=int,
+                        default=50, help="Number of channels to be generated for every simulation")
+    parser.add_argument("--width", type=float,
+                        default=500, help="The maximum power for users.")
+    parser.add_argument("--width_dim", type=float,
+                        default=250, help="The maximum power for users.")
+    parser.add_argument("--p_max", type=float,
+                        default=200, help="The maximum power for users.")
+    parser.add_argument("--se_inc_thr", type=float,
+                        default=0.01, help="The threshold for se improvement whether surve user.")
     # network parameters
     parser.add_argument("--share_policy", action='store_false',
                         default=False, help='Whether agent share the same policy')
@@ -313,6 +316,8 @@ def get_config():
 
     # pretrained parameters
     parser.add_argument("--model_dir", type=str, default=None,
+                        help="by default None. set the path to pretrained model.")
+    parser.add_argument("--env_dir", type=str, default="./data/env/",
                         help="by default None. set the path to pretrained model.")
 
     # safe parameters

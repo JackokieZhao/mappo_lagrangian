@@ -110,16 +110,15 @@ def main(args):
         "run_dir": run_dir
     }
 
-    # run experiments
+    # TODO: run experiments
     if all_args.share_policy:
         from runner.shared.mujoco_runner import MujocoRunner as Runner
     else:
         # in origin code not implement this method
         if all_args.alg == "mappo_lagr":
-            from runner.separated.mujoco_runner_mappo_lagr import \
-                MujocoRunner as Runner
+            from runner.mujoco_runner_mappo_lagr import MujocoRunner as Runner
         else:
-            from runner.separated.mujoco_runner import MujocoRunner as Runner
+            from runner.mujoco_runner import MujocoRunner as Runner
 
     runner = Runner(config)
     runner.run()

@@ -1,8 +1,10 @@
-import torch
-import numpy as np
 from collections import defaultdict
 
-from mappo_lagrangian.utils.util import check, get_shape_from_obs_space, get_shape_from_act_space
+import numpy as np
+import torch
+
+from mappo_lagrangian.utils.util import (check, get_shape_from_act_space,
+                                         get_shape_from_obs_space)
 
 
 def _flatten(T, N, x):
@@ -15,7 +17,7 @@ def _cast(x):
 
 class SeparatedReplayBuffer(object):
     def __init__(self, args, obs_space, share_obs_space, act_space):
-        self.episode_length = args.episode_length
+        self.eps_limit = args.eps_limit
         self.n_rollout_threads = args.n_rollout_threads
         self.rnn_hidden_size = args.hidden_size
         self.recurrent_N = args.recurrent_N
@@ -36,36 +38,36 @@ class SeparatedReplayBuffer(object):
         if type(share_obs_shape[-1]) == list:
             share_obs_shape = share_obs_shape[:1]
 
-        self.aver_episode_costs = np.zeros((self.episode_length + 1, self.n_rollout_threads, *obs_shape),
+        self.aver_episode_costs = np.zeros((self.eps_limit + 1, self.n_rollout_threads, *obs_shape),
                                            dtype=np.float32)
-        self.share_obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, *share_obs_shape), dtype=np.float32)
-        self.obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, *obs_shape), dtype=np.float32)
+        self.share_obs = np.zeros((self.eps_limit + 1, self.n_rollout_threads, *share_obs_shape), dtype=np.float32)
+        self.obs = np.zeros((self.eps_limit + 1, self.n_rollout_threads, *obs_shape), dtype=np.float32)
 
-        self.rnn_states = np.zeros((self.episode_length + 1, self.n_rollout_threads,
+        self.rnn_states = np.zeros((self.eps_limit + 1, self.n_rollout_threads,
                                    self.recurrent_N, self.rnn_hidden_size), dtype=np.float32)
         self.rnn_states_critic = np.zeros_like(self.rnn_states)
         self.rnn_states_cost = np.zeros_like(self.rnn_states)
 
-        self.value_preds = np.zeros((self.episode_length + 1, self.n_rollout_threads, 1), dtype=np.float32)
-        self.returns = np.zeros((self.episode_length + 1, self.n_rollout_threads, 1), dtype=np.float32)
+        self.value_preds = np.zeros((self.eps_limit + 1, self.n_rollout_threads, 1), dtype=np.float32)
+        self.returns = np.zeros((self.eps_limit + 1, self.n_rollout_threads, 1), dtype=np.float32)
 
         if act_space.__class__.__name__ == 'Discrete':
             self.available_actions = np.ones(
-                (self.episode_length + 1, self.n_rollout_threads, act_space.n), dtype=np.float32)
+                (self.eps_limit + 1, self.n_rollout_threads, act_space.n), dtype=np.float32)
         else:
             self.available_actions = None
 
         act_shape = get_shape_from_act_space(act_space)
 
-        self.actions = np.zeros((self.episode_length, self.n_rollout_threads, act_shape), dtype=np.float32)
-        self.action_log_probs = np.zeros((self.episode_length, self.n_rollout_threads, act_shape), dtype=np.float32)
-        self.rewards = np.zeros((self.episode_length, self.n_rollout_threads, 1), dtype=np.float32)
+        self.actions = np.zeros((self.eps_limit, self.n_rollout_threads, act_shape), dtype=np.float32)
+        self.action_log_probs = np.zeros((self.eps_limit, self.n_rollout_threads, act_shape), dtype=np.float32)
+        self.rewards = np.zeros((self.eps_limit, self.n_rollout_threads, 1), dtype=np.float32)
 
         self.costs = np.zeros_like(self.rewards)
         self.cost_preds = np.zeros_like(self.value_preds)
         self.cost_returns = np.zeros_like(self.returns)
 
-        self.masks = np.ones((self.episode_length + 1, self.n_rollout_threads, 1), dtype=np.float32)
+        self.masks = np.ones((self.eps_limit + 1, self.n_rollout_threads, 1), dtype=np.float32)
         self.bad_masks = np.ones_like(self.masks)
         self.active_masks = np.ones_like(self.masks)
 
@@ -104,7 +106,7 @@ class SeparatedReplayBuffer(object):
         if rnn_states_cost is not None:
             self.rnn_states_cost[self.step + 1] = rnn_states_cost.copy()
 
-        self.step = (self.step + 1) % self.episode_length
+        self.step = (self.step + 1) % self.eps_limit
 
     def chooseinsert(self, share_obs, obs, rnn_states, rnn_states_critic, actions, action_log_probs,
                      value_preds, rewards, masks, bad_masks=None, active_masks=None, available_actions=None):
@@ -124,7 +126,7 @@ class SeparatedReplayBuffer(object):
         if available_actions is not None:
             self.available_actions[self.step] = available_actions.copy()
 
-        self.step = (self.step + 1) % self.episode_length
+        self.step = (self.step + 1) % self.eps_limit
 
     def after_update(self):
         self.share_obs[0] = self.share_obs[-1].copy()
@@ -244,15 +246,15 @@ class SeparatedReplayBuffer(object):
                         self.gamma * self.masks[step + 1] + self.costs[step]
 
     def feed_forward_generator(self, advantages, num_mini_batch=None, mini_batch_size=None, cost_adv=None):
-        episode_length, n_rollout_threads = self.rewards.shape[0:2]
-        batch_size = n_rollout_threads * episode_length
+        eps_limit, n_rollout_threads = self.rewards.shape[0:2]
+        batch_size = n_rollout_threads * eps_limit
 
         if mini_batch_size is None:
             assert batch_size >= num_mini_batch, (
                 "PPO requires the number of processes ({}) "
                 "* number of steps ({}) = {} "
                 "to be greater than or equal to the number of PPO mini batches ({})."
-                "".format(n_rollout_threads, episode_length, n_rollout_threads * episode_length,
+                "".format(n_rollout_threads, eps_limit, n_rollout_threads * eps_limit,
                           num_mini_batch))
             mini_batch_size = batch_size // num_mini_batch
 
@@ -370,7 +372,7 @@ class SeparatedReplayBuffer(object):
                     factor_batch.append(self.factor[:, ind])
 
             # [N[T, dim]]
-            T, N = self.episode_length, num_envs_per_batch
+            T, N = self.eps_limit, num_envs_per_batch
             # These are all from_numpys of size (T, N, -1)
             share_obs_batch = np.stack(share_obs_batch, 1)
             obs_batch = np.stack(obs_batch, 1)

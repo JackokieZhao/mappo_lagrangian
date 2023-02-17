@@ -1,6 +1,8 @@
-import torch
 import numpy as np
-from mappo_lagrangian.utils.util import get_shape_from_obs_space, get_shape_from_act_space
+import torch
+
+from mappo_lagrangian.utils.util import (get_shape_from_act_space,
+                                         get_shape_from_obs_space)
 
 
 def _flatten(T, N, x):
@@ -22,7 +24,7 @@ class SharedReplayBuffer(object):
     """
 
     def __init__(self, args, n_agents, obs_space, cent_obs_space, act_space):
-        self.episode_length = args.episode_length
+        self.eps_limit = args.eps_limit
         self.n_rollout_threads = args.n_rollout_threads
         self.hidden_size = args.hidden_size
         self.recurrent_N = args.recurrent_N
@@ -43,21 +45,21 @@ class SharedReplayBuffer(object):
         if type(share_obs_shape[-1]) == list:
             share_obs_shape = share_obs_shape[:1]
 
-        self.share_obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, n_agents, *share_obs_shape),
+        self.share_obs = np.zeros((self.eps_limit + 1, self.n_rollout_threads, n_agents, *share_obs_shape),
                                   dtype=np.float32)
-        self.obs = np.zeros((self.episode_length + 1, self.n_rollout_threads, n_agents, *obs_shape), dtype=np.float32)
+        self.obs = np.zeros((self.eps_limit + 1, self.n_rollout_threads, n_agents, *obs_shape), dtype=np.float32)
 
         self.rnn_states = np.zeros(
-            (self.episode_length + 1, self.n_rollout_threads, n_agents, self.recurrent_N, self.hidden_size),
+            (self.eps_limit + 1, self.n_rollout_threads, n_agents, self.recurrent_N, self.hidden_size),
             dtype=np.float32)
         self.rnn_states_critic = np.zeros_like(self.rnn_states)
 
         self.value_preds = np.zeros(
-            (self.episode_length + 1, self.n_rollout_threads, n_agents, 1), dtype=np.float32)
+            (self.eps_limit + 1, self.n_rollout_threads, n_agents, 1), dtype=np.float32)
         self.returns = np.zeros_like(self.value_preds)
 
         if act_space.__class__.__name__ == 'Discrete':
-            self.available_actions = np.ones((self.episode_length + 1, self.n_rollout_threads, n_agents, act_space.n),
+            self.available_actions = np.ones((self.eps_limit + 1, self.n_rollout_threads, n_agents, act_space.n),
                                              dtype=np.float32)
         else:
             self.available_actions = None
@@ -65,13 +67,13 @@ class SharedReplayBuffer(object):
         act_shape = get_shape_from_act_space(act_space)
 
         self.actions = np.zeros(
-            (self.episode_length, self.n_rollout_threads, n_agents, act_shape), dtype=np.float32)
+            (self.eps_limit, self.n_rollout_threads, n_agents, act_shape), dtype=np.float32)
         self.action_log_probs = np.zeros(
-            (self.episode_length, self.n_rollout_threads, n_agents, act_shape), dtype=np.float32)
+            (self.eps_limit, self.n_rollout_threads, n_agents, act_shape), dtype=np.float32)
         self.rewards = np.zeros(
-            (self.episode_length, self.n_rollout_threads, n_agents, 1), dtype=np.float32)
+            (self.eps_limit, self.n_rollout_threads, n_agents, 1), dtype=np.float32)
 
-        self.masks = np.ones((self.episode_length + 1, self.n_rollout_threads, n_agents, 1), dtype=np.float32)
+        self.masks = np.ones((self.eps_limit + 1, self.n_rollout_threads, n_agents, 1), dtype=np.float32)
         self.bad_masks = np.ones_like(self.masks)
         self.active_masks = np.ones_like(self.masks)
 
@@ -110,7 +112,7 @@ class SharedReplayBuffer(object):
         if available_actions is not None:
             self.available_actions[self.step + 1] = available_actions.copy()
 
-        self.step = (self.step + 1) % self.episode_length
+        self.step = (self.step + 1) % self.eps_limit
 
     def chooseinsert(self, share_obs, obs, rnn_states, rnn_states_critic, actions, action_log_probs,
                      value_preds, rewards, masks, bad_masks=None, active_masks=None, available_actions=None):
@@ -145,7 +147,7 @@ class SharedReplayBuffer(object):
         if available_actions is not None:
             self.available_actions[self.step] = available_actions.copy()
 
-        self.step = (self.step + 1) % self.episode_length
+        self.step = (self.step + 1) % self.eps_limit
 
     def after_update(self):
         """Copy last timestep data to first index. Called after update to model."""
@@ -199,16 +201,16 @@ class SharedReplayBuffer(object):
         :param num_mini_batch: (int) number of minibatches to split the batch into.
         :param mini_batch_size: (int) number of samples in each minibatch.
         """
-        episode_length, n_rollout_threads, n_agents = self.rewards.shape[0:3]
-        batch_size = n_rollout_threads * episode_length * n_agents
+        eps_limit, n_rollout_threads, n_agents = self.rewards.shape[0:3]
+        batch_size = n_rollout_threads * eps_limit * n_agents
 
         if mini_batch_size is None:
             assert batch_size >= num_mini_batch, (
                 "PPO requires the number of processes ({}) "
                 "* number of steps ({}) * number of agents ({}) = {} "
                 "to be greater than or equal to the number of PPO mini batches ({})."
-                "".format(n_rollout_threads, episode_length, n_agents,
-                          n_rollout_threads * episode_length * n_agents,
+                "".format(n_rollout_threads, eps_limit, n_agents,
+                          n_rollout_threads * eps_limit * n_agents,
                           num_mini_batch))
             mini_batch_size = batch_size // num_mini_batch
 
@@ -260,7 +262,7 @@ class SharedReplayBuffer(object):
         :param advantages: (np.ndarray) advantage estimates.
         :param num_mini_batch: (int) number of minibatches to split the batch into.
         """
-        episode_length, n_rollout_threads, n_agents = self.rewards.shape[0:3]
+        eps_limit, n_rollout_threads, n_agents = self.rewards.shape[0:3]
         batch_size = n_rollout_threads * n_agents
         assert n_rollout_threads * n_agents >= num_mini_batch, (
             "PPO requires the number of processes ({})* number of agents ({}) "
@@ -314,7 +316,7 @@ class SharedReplayBuffer(object):
                 adv_targ.append(advantages[:, ind])
 
             # [N[T, dim]]
-            T, N = self.episode_length, num_envs_per_batch
+            T, N = self.eps_limit, num_envs_per_batch
             # These are all from_numpys of size (T, N, -1)
             share_obs_batch = np.stack(share_obs_batch, 1)
             obs_batch = np.stack(obs_batch, 1)
@@ -358,8 +360,8 @@ class SharedReplayBuffer(object):
         :param num_mini_batch: (int) number of minibatches to split the batch into.
         :param data_chunk_length: (int) length of sequence chunks with which to train RNN.
         """
-        episode_length, n_rollout_threads, n_agents = self.rewards.shape[0:3]
-        batch_size = n_rollout_threads * episode_length * n_agents
+        eps_limit, n_rollout_threads, n_agents = self.rewards.shape[0:3]
+        batch_size = n_rollout_threads * eps_limit * n_agents
         data_chunks = batch_size // data_chunk_length  # [C=r*T*M/L]
         mini_batch_size = data_chunks // num_mini_batch
 

@@ -20,35 +20,48 @@ def access_pilot(M, K, Gain, tau_p):
     :param tau_p: number of orthogonal pilots
     :return: D_fd is a matrix of size MxK, where M is the number of APs and K is the number of UEs.
     """
-    pilot_fd = 1000*torch.ones(K, dtype=torch.int)
-    D_fd = np.zeros([M, K], dtype=np.int)
-    masterAPs = np.zeros(K, dtype=np.int)
+    pilots = 1000*torch.ones(K, dtype=torch.int)
+    D_C = torch.zeros([M, K], dtype=torch.int)
+    masterAPs = torch.zeros(K, dtype=torch.int)
+    master_count = torch.zeros(M, dtype=torch.int)  # Store the count that the bs served as.
+
     # Set threshold for when a non-master AP decides to serve a UE
-    threshold = -40
-    # dB
+    threshold = -40  # dB
 
     for k in range(K):
 
-        # channel condition
-        master = torch.argmax(Gain[:, k])
-        D_fd[master, k] = 1
-        masterAPs[k] = master
+        while True:
+            # channel condition
+            master = torch.argmax(Gain[:, k])
 
-        # Assign orthogonal pilots to the first tau_p UEs
-        if k < tau_p:
+            master_count[master] += 1
 
-            pilot_fd[k] = k
+            # If the count is larger than the number of pilots, than it will not serve as master APs for other users.
+            if master_count[master] <= tau_p:
+                D_C[master, k] = 1
+                masterAPs[k] = master
 
-        else:  # Assign pilot for remaining UEs
+                # Assign orthogonal pilots to the first tau_p UEs
+                if k < tau_p:
 
-            # Compute received power from ue to the master AP from each pilot
-            pilot_inf = torch.zeros(tau_p, 1)
-            for t in range(tau_p):
-                pilot_inf[t] = torch.sum(db2pow(Gain[master, (pilot_fd == t)]))
+                    pilots[k] = k
 
-            # np.where the pilot with the least receiver power
-            bestpilot = torch.argmin(pilot_inf)
-            pilot_fd[k] = bestpilot
+                else:  # Assign pilot for remaining UEs
+
+                    # Compute received power from ue to the master AP from each pilot
+                    pilot_inf = torch.zeros(tau_p, 1)
+                    for t in range(tau_p):
+                        pilot_inf[t] = torch.sum(db2pow(Gain[master, (pilots == t)]))
+
+                    # np.where the pilot with the least receiver power
+                    pilots[k] = torch.argmin(pilot_inf)
+
+                break
+
+            else:
+
+                Gain[master, k] = -1e10
+                continue
 
     # Each AP serves the UE with the strongest channel condition on each of
     # the pilots where the AP isn't the master AP, but only if its channel
@@ -57,31 +70,31 @@ def access_pilot(M, K, Gain, tau_p):
 
         for t in range(tau_p):
 
-            pilotUEs = torch.where(t == pilot_fd)[0]
+            pilot_ues = torch.where(t == pilots)[0]
             # Users with pilot t.
 
-            # If the AP is not a master AP with pilot t.
-            if (sum(D_fd[m, pilotUEs]) == 0) & (len(pilotUEs) > 0):
+            # If the AP is not serve any user with pilot t.
+            if (sum(D_C[m, pilot_ues]) == 0) & (len(pilot_ues) > 0):
 
                 # np.where the UE with pilot t with the best channel
-                [gainValue, UEindex] = torch.max(Gain[m, pilotUEs], dim=0)
+                [gainValue, UEindex] = torch.max(Gain[m, pilot_ues], dim=0)
 
                 # Serve this UE if the channel is at most "threshold" weaker
                 # than the master AP's channel
                 # [gainValue Gain(masterAPs(pilotUEs(UEindex)), pilotUEs(UEindex),n)]
-                gain_b = Gain[masterAPs[pilotUEs[UEindex]], pilotUEs[UEindex]]
+                gain_b = Gain[masterAPs[pilot_ues[UEindex]], pilot_ues[UEindex]]
 
                 if gainValue - gain_b >= threshold:
-                    D_fd[m, pilotUEs[UEindex]] = 1
+                    D_C[m, pilot_ues[UEindex]] = 1
 
-    return D_fd, pilot_fd
+    return D_C, pilots
 
 
-def semvs_associate(se_imp_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
+def semvs_associate(se_inc_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
     """
     > The function `semvs_associate` is used to associate the users with the UBSs.
 
-    :param se_imp_thr: The minimum improvement in SE that is required to add a new UBS to the set of
+    :param se_inc_thr: The minimum improvement in SE that is required to add a new UBS to the set of
     serving UBSs
     :param M: number of UBSs
     :param K: number of users
@@ -95,7 +108,7 @@ def semvs_associate(se_imp_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
     """
 
     # Compute the candidate service service.
-    D_S = np.zeros([M, K], dtype=np.int)
+    D_S = torch.zeros([M, K], dtype=torch.int)
     power = p_max * torch.ones(K)
 
     # Determine the set of candidate serving ubs for all users.
@@ -103,21 +116,22 @@ def semvs_associate(se_imp_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
     K_m_set = [[] for _ in range(M)]    # Service User set for UBS m.
 
     # Setup a small se, so if adding a new UBS, then 'phi' is large.
-    se_opt = 1e-5 * torch.ones(K, 1)
+    se_opt = 1e-5 * torch.ones(K)
 
     M_C_set = [[] for _ in range(K)]
 
     # Candidate service UBS set for any user k.
-    n_can_ubs = np.zeros(K, dtype=np.int)
+    n_can_ubs = torch.zeros(K, dtype=torch.int)
 
     # TAG: Statistics of numbers for candidate service ubs for user k.
     for k in range(K):
-        can_ubs_k = list(np.argwhere(D_C[:, k] == 1).flatten())  # ubs index.
+        can_ubs_k = torch.where(D_C[:, k] == 1)[0].flatten()  # ubs index.
         M_C_set[k] = can_ubs_k
         n_can_ubs[k] = len(can_ubs_k)
 
     # TAG: Sort the users according to number of acceptable service ubs.
-    ue_sort_idx = np.argsort(n_can_ubs)
+    ue_sort_idx = torch.argsort(n_can_ubs)
+    se_inc = torch.zeros([M, K])
 
     while True:
 
@@ -131,19 +145,22 @@ def semvs_associate(se_imp_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
             if n_can_ubs_k <= 0:
                 continue
 
-            opt_se_k, opt_ubs_k, del_ubs_k = choose_ubs(se_imp_thr, k, can_ubs_k, M_k_set[k], se_opt[k],
+            opt_se_k, opt_ubs_k, del_ubs_k = choose_ubs(se_inc_thr, k, can_ubs_k, M_k_set[k], se_opt[k],
                                                         power, D_C, g_stat, g2_stat, F_stat)
 
             # INFO: Update records.
             if (opt_ubs_k != -1) & (len(K_m_set[opt_ubs_k]) < K_T):
+
+                se_inc[opt_ubs_k, k] = opt_se_k - se_opt[k]
                 se_opt[k] = opt_se_k
+
                 M_k_set[k].append(opt_ubs_k)
                 K_m_set[opt_ubs_k].append(k)
 
             # INFO: Delete the ubs.
             if len(del_ubs_k) > 0:
                 for i in range(len(del_ubs_k)):
-                    M_C_set[k].remove(del_ubs_k[i])
+                    M_C_set[k] = M_C_set[k][M_C_set[k] != del_ubs_k[i]]
                     n_can_ubs[k] = n_can_ubs[k] - 1
 
         # INFO: If there is no candidate ubs.
@@ -153,7 +170,7 @@ def semvs_associate(se_imp_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
     for k in range(K):
         D_S[M_k_set[k], k] = 1
 
-    return D_S
+    return D_S, se_inc
 
 
 def choose_ubs(inc_thr, k, can_ubs_set, serve_ubs, cu_se_opt, power, D, g_stat, g2_stat, F_stat):
@@ -179,10 +196,11 @@ def choose_ubs(inc_thr, k, can_ubs_set, serve_ubs, cu_se_opt, power, D, g_stat, 
 
     for j in range(n_can_ubs):
 
+        serve_ubs_ext = serve_ubs.copy()
         m_idx = can_ubs_set[j]  # observe ubs index.
 
         # Expand set to evaluate.
-        serve_ubs_ext = np.append(serve_ubs, m_idx).astype(np.int64)    # UBS indexes
+        serve_ubs_ext.append(m_idx)    # UBS indexes
 
         # serve_ubs_ext = np.where(D(: , k) == 1)
         se_tmp = compute_se_lsfd_mmse_k(k, D, g_stat, g2_stat, F_stat, power, True, serve_ubs_ext)

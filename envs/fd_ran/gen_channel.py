@@ -4,7 +4,6 @@ import mat73 as mat
 import matlab.engine as engine
 import numpy as np
 import torch
-
 from associate import access_pilot, semvs_associate
 from channel import channel_statistics, chl_estimate, environment
 from compute import compute_se_lsfd_mmse
@@ -24,7 +23,7 @@ def gen_channel():
     M = 16
     N = 4
     tau_p = 10
-    se_imp_thr = 0.01
+    se_inc_thr = 0.01
 
     eng = engine.start_matlab()
 
@@ -49,7 +48,7 @@ def gen_channel():
         [gki_stat, gki2_stat, F_stat] = channel_statistics(Hhat, H, D_C, C, N_chs, M, N, K, p_max)
 
         # # Determine the access matrix for FD-RAN.
-        D_S = semvs_associate(se_imp_thr, M, K, tau_p, D_C, gki_stat, gki2_stat, F_stat, p_max)
+        D_S = semvs_associate(se_inc_thr, M, K, tau_p, D_C, gki_stat, gki2_stat, F_stat, p_max)
 
         # Compute spectrum efficiency.
         se = compute_se_lsfd_mmse(K, D_S, gki_stat, gki2_stat, F_stat, p_max, True)

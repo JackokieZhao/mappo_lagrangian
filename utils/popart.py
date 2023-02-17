@@ -1,6 +1,15 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@File        :popart.py
+@Data        :2023/02/17 10:42:02
+@Version     :1.0
+@Author      :Jackokie
+@Contact     :jackokie@gmail.com
+'''
+
 
 import numpy as np
-
 import torch
 import torch.nn as nn
 

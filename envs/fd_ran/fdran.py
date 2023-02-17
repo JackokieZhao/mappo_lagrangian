@@ -40,8 +40,7 @@ def convert_observation_to_space(observation):
 
 
 class FDRAN(gym.Env, utils.EzPickle):
-    def __init__(self, sce_idx, device,  env_dir='./data/env/', eps_limit=1e4, se_imp_thr=0.01, M=16, N=4,
-                 K=50, N_chs=50, width=500.0, p_max=200.0, tau_p=10) -> None:
+    def __init__(self, sce_idx, device, configs) -> None:
         """__init__: Initi function of the class.
 
         Args:
@@ -60,20 +59,20 @@ class FDRAN(gym.Env, utils.EzPickle):
         self._steps = 0
         self._ratio = 0.1
 
-        self._W_dim = 500
-        self._pos_inc = 1000 / self._W_dim
+        self._pos_inc = configs.width / configs.width_dim
 
-        self._width = width
-        self._M = M
-        self._K = K
-        self._N = N
-        self._N_chs = N_chs
-        self._p_max = p_max
-        self._tau_p = tau_p
-        self._se_imp_thr = se_imp_thr
+        self._width = configs.width
+        self._width_dim = configs.width_dim
+        self._M = configs.M
+        self._K = configs.K
+        self._N = configs.N
+        self._N_chs = configs.n_chs
+        self._p_max = configs.p_max
+        self._tau_p = configs.tau_p
+        self._se_inc_thr = configs.se_inc_thr
 
         # INFO:  load scenario from scriptz
-        self.eps_lim = eps_limit
+        self.eps_lim = configs.eps_limit
 
         self._se = 0
         self._state_la = []
@@ -100,33 +99,29 @@ class FDRAN(gym.Env, utils.EzPickle):
         self._R_dict = []
         self._R_sqrt_dict = []
         self._Gain_dict = []
-        self._acts_cont = 0
+        self._actions_cont = 0
 
-        self._load_envs(env_dir, sce_idx)
+        self._load_envs(configs.env_dir, sce_idx)
 
         # self._set_action_space()
-        self.action_space = spaces.Box(low=np.full(8, -1, dtype=np.float32),
-                                       high=np.full(8, 1, dtype=np.float32))
-        self.observation_space = spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
-                                            np.full(29, -float('inf'), dtype=np.float32))
+        self.action_space = spaces.Box(low=np.full(self._M * 2, -10, dtype=np.float32),
+                                       high=np.full(self._M * 2, 10, dtype=np.float32))
+
+        # bs <---> user channel, bs index.
+        self.obs_space = spaces.Box(low=np.full(self._K + self._M, -float('inf'), dtype=np.float32),
+                                    high=np.full(self._K + self._M, float('inf'), dtype=np.float32))
+        self.obs_glb_space = spaces.Box(low=np.full(self._M * 2, -float('inf'), dtype=np.float32),
+                                        high=np.full(self._M * 2, float('inf'), dtype=np.float32))
 
         self.seed()
 
         # reset for the environment.
         self.reset()
 
-    @classmethod
-    def from_args(cls, sce_idx, device, cfg, **kwargs):
-        defaults = dict(sce_idx=sce_idx, device=device, env_dir=cfg.env_dir,
-                        se_imp_thr=cfg.se_imp_thr, M=cfg.M, N=cfg.N, K=cfg.K,
-                        N_chs=cfg.N_chs, width=cfg.width, p_max=cfg.p_max, tau_p=cfg.tau_p)
-        defaults.update(**kwargs)
-        return cls(**defaults)
-
     def _load_envs(self, env_dir, env_idx):
 
         # Load environment.
-        env_file = env_dir + 'scenario_' + str(env_idx) + '.mat'
+        env_file = env_dir + 'result_' + str(env_idx) + '.mat'
         data = mat.loadmat(env_file)    # ues_pos, bs_pos, R, R_sqrt, gain
 
         self._ues_pos = torch.tensor(data['ues_pos'])
@@ -158,13 +153,13 @@ class FDRAN(gym.Env, utils.EzPickle):
           the index of the position of the bounding box.
         """
         pos_convert = np.floor(self._bs_pos / 2)
-        pos_idx = self._W_dim * pos_convert[:, 1] + pos_convert[:, 0]
+        pos_idx = self._width_dim * pos_convert[:, 1] + pos_convert[:, 0]
         return pos_idx
 
-    def step(self, acts):
-        """step Environment change accoring to acts.
+    def step(self, actions):
+        """step Environment change accoring to actions.
         Args:
-            acts (float array): acts for different agents.
+            actions (float array): actions for different agents.
         """
 
         # INFO: Store the last state.
@@ -173,18 +168,19 @@ class FDRAN(gym.Env, utils.EzPickle):
         self._cost_la = self._cost
 
         # INFO: Environment transfer.
-        self._state_transfer(acts)
+        self._state_transfer(actions)
 
         # Store the current state.
         self._steps = self._steps + 1
 
-        ob = self.get_obs()
-        done = self.check_terminate(acts)
+        obs = np.array(self._get_obs())
+        obs_glb = self._get_obs_glb()
+        done = self.check_terminate(actions)
         reward = self._reward
 
-        return ob, reward, done, self._cost
+        return obs, obs_glb, reward, self._cost.sum(), done
 
-    def seed(self, seed=None):
+    def seed(self, seed = None):
         """
         The function takes in a seed and returns a seed
 
@@ -194,63 +190,65 @@ class FDRAN(gym.Env, utils.EzPickle):
         Returns:
           The seed is being returned.
         """
-        self.np_random, seed = seeding.np_random(seed)
+        self.np_random, seed=seeding.np_random(seed)
         return [seed]
 
-    def check_terminate(self, acts):
+    def check_terminate(self, actions):
         """
-        If the sum of the actions is 0, then increment the acts_cont variable by 1. If the sum of the
-        actions is not 0, then set the acts_cont variable to 0. If the acts_cont variable is greater
+        If the sum of the actions is 0, then increment the actions_cont variable by 1. If the sum of the
+        actions is not 0, then set the actions_cont variable to 0. If the actions_cont variable is greater
         than or equal to 3, then return True
 
         Args:
-          acts: the actions of the agents
+          actions: the actions of the agents
 
         Returns:
           The number of times the agent has not taken an action.
         """
-        if np.sum(acts) == 0:
-            self._acts_cont += 1
+        if np.sum(actions) == 0:
+            self._actions_cont += 1
         else:
-            self._acts_cont = 0
+            self._actions_cont=0
 
-        return self._acts_cont >= 3
+        return self._actions_cont >= 3
 
-    def _state_transfer(self, acts):
+    def _state_transfer(self, actions):
 
         # INFO: Update base station positions.
-        self._bs_pos = self._bs_pos + acts
+        self._bs_pos=self._bs_pos + actions
 
         # Acquire Gain, R, and R_sqrt.
         # bs_pos_ax = torch.floor(self._bs_pos[i])
-        pos_idx = self.pos2idx()
+        pos_idx=self.pos2idx()
 
-        gain = self._Gain_dict[pos_idx, :]
-        R = self._R_dict[:, :, pos_idx, :]
-        R_sqrt = self._R_sqrt_dict[:, :, pos_idx, :]
+        gain=self._Gain_dict[pos_idx, :]
+        R=self._R_dict[:, :, pos_idx, :]
+        R_sqrt=self._R_sqrt_dict[:, :, pos_idx, :]
 
-        [se, se_inc, D, D_C] = self._env_transfer(gain, R, R_sqrt)
+        [se, se_inc, D, D_C]=self._env_transfer(gain, R, R_sqrt)
 
-        self._state = [gain, D, D_C, self._bs_pos]
+        self._state=[gain, D, D_C, self._bs_pos]
 
-        # INFO: Reward.
-        self._reward = np.sum(se_inc, 1)
+        # TODO: Reward: =========================================
+        # self._reward = torch.sum(se_inc, 1)
+        self._reward=se.sum()  # Share the reward
 
-        # INFO: Cost
-        self._cost = self._ratio * np.sum(np.abs(acts), 1)
+        # TODO: Cost: ===========================================
+        # self._cost = self._ratio * np.sum(np.abs(actions))
+        self._cost=self._ratio * np.sum(np.abs(actions), 1)
 
     def _env_transfer(self, Gain, R, R_sqrt):
         # candidate ubs and pilot allocation.
-        [D_C, pilot] = access_pilot(self._M, self._K, Gain, self._tau_p)
-        Hhat, H, C = chl_estimate(R, R_sqrt, self._N_chs, self._M, self._N,
+        [D_C, pilot]=access_pilot(self._M, self._K, Gain, self._tau_p)
+        Hhat, H, C=chl_estimate(R, R_sqrt, self._N_chs, self._M, self._N,
                                   self._K, self._tau_p, pilot, self._p_max)
 
         # Statistics for channels.
-        [gki_stat, gki2_stat, F_stat] = channel_statistics(
+        [gki_stat, gki2_stat, F_stat]=channel_statistics(
             Hhat, H, D_C, C, self._N_chs, self._M, self._N, self._K, self._p_max)
 
         # # Determine the access matrix for FD-RAN.
-        [D, se_inc] = semvs_associate(self._se_imp_thr, self._M, self._K, self._tau_p,
+        [D, se_inc] = semvs_associate(self._se_inc_thr, self._M, self._K, self._tau_p,
                                       D_C, gki_stat, gki2_stat, F_stat, self._p_max)
 
         # Compute spectrum efficiency.
@@ -258,36 +256,25 @@ class FDRAN(gym.Env, utils.EzPickle):
 
         return se, se_inc, D, D_C
 
-    def get_obs_glb(self, state):
+    def _get_obs_glb(self, ):
         """ Returns all agent observations in a list """
-        [gain, D, glb_info] = state
-        obs_n = []
-        for a in range(self.n_agents):
-            agent_id_feat = np.zeros(self._M, dtype=np.float32)
-            agent_id_feat[a] = 1.0
-
-            obs_a = torch.concat([gain[:, a], D[:, a]], dim=1)
-            obs_g = torch.concat([glb_info, agent_id_feat], dim=1)
-
-            obs_n.append([obs_a, obs_g])
-
-        return obs_n
+        return self._bs_pos
 
     def _get_obs(self, ):
 
-        [gain, D, D_C, glb_info] = self._state
+        [gain, D, D_C, _] = self._state
 
         obs_n = []
-        for a in range(self.n_agents):
+        for m in range(self._M):
             # INFO: Local observe for agent a.
-            obs_a = torch.concat([gain[a, :]*D_C[a, :], [D[a, :]]], axis=0)
+            # obs_a = torch.concat([gain[m, :]*D_C[m, :], D[m, :]], axis=0)
+            # obs_a = gain[m, :]*D[m, :]
+            obs_a = gain[m, :]*D_C[m, :]
 
             # INFO: Global observe --> user positions.
-            agent_id_fea = torch.zeros(self._M, dtyp=torch.float32)
-            agent_id_fea[a] = 1
-            obs_g = torch.concat([agent_id_fea, glb_info])
-
-            obs_n.append([obs_a, obs_g])
+            agent_id_fea = torch.zeros(self._M, dtype=torch.float32)
+            agent_id_fea[m] = 1
+            obs_n.append(torch.concat([obs_a, agent_id_fea]).numpy())
 
         return obs_n
 

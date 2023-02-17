@@ -3,7 +3,7 @@ import gym
 import numpy as np
 from gym.spaces import Box
 
-from .safety_ma_mujoco.ant import AntEnv
+from .mujoco.ant import AntEnv
 
 
 class TimeLimit(gym.Wrapper):
@@ -27,6 +27,7 @@ class TimeLimit(gym.Wrapper):
     def reset(self, **kwargs):
         self._elapsed_steps = 0
         return self.env.reset(**kwargs)
+
 
 class NormalizedActions(gym.ActionWrapper):
 
@@ -79,7 +80,6 @@ class MujocoMulti(object):
         obs_n, reward_n, cost_n, done_n = self.wrapped_env.step(flat_actions)
         self.steps += 1
 
-        # return reward_n, done_n, info
         rewards = [[reward_n]] * self.n_agents
         costs = [[cost_n]] * self.n_agents
         dones = [done_n] * self.n_agents

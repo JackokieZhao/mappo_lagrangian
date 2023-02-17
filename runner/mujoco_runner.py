@@ -1,8 +1,10 @@
 import time
-import wandb
-import numpy as np
 from functools import reduce
+
+import numpy as np
 import torch
+import wandb
+
 from mappo_lagrangian.runner.separated.base_runner import Runner
 
 
@@ -20,7 +22,7 @@ class MujocoRunner(Runner):
         self.warmup()
 
         start = time.time()
-        episodes = int(self.num_env_steps) // self.episode_length // self.n_rollout_threads
+        episodes = int(self.num_env_steps) // self.eps_limit // self.n_rollout_threads
 
         train_episode_rewards = [0 for _ in range(self.n_rollout_threads)]
 
@@ -30,7 +32,7 @@ class MujocoRunner(Runner):
 
             done_episodes_rewards = []
 
-            for step in range(self.episode_length):
+            for step in range(self.eps_limit):
                 # Sample actions
                 values, actions, action_log_probs, rnn_states, rnn_states_critic = self.collect(step)
 
@@ -57,7 +59,7 @@ class MujocoRunner(Runner):
             train_infos = self.train()
 
             # post process
-            total_num_steps = (episode + 1) * self.episode_length * self.n_rollout_threads
+            total_num_steps = (episode + 1) * self.eps_limit * self.n_rollout_threads
             # save model
             if (episode % self.save_interval == 0 or episode == episodes - 1):
                 self.save()
