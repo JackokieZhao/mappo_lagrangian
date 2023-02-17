@@ -144,7 +144,8 @@ def worker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, obs_glb, reward, cost, done = env.step(data)
+            observe, reward, done, cost = env.step(data)
+            [ob, obs_glb] = observe
             if 'bool' in done.__class__.__name__:
                 if done:
                     ob = env.reset()
@@ -152,7 +153,7 @@ def worker(remote, parent_remote, env_fn_wrapper):
                 if np.all(done):
                     ob = env.reset()
 
-            remote.send((ob, obs_glb, reward, cost, done))
+            remote.send((ob, obs_glb, reward, done, cost))
         elif cmd == 'reset':
             ob = env.reset()
             remote.send((ob))
@@ -303,11 +304,11 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, obs_glb, reward, cost, done, available_actions = env.step(data)
+            ob, obs_glb, reward, done, cost, available_actions = env.step(data)
             if np.all(np.array(done)):
                 ob, obs_glb, available_actions = env.reset()
 
-            remote.send((ob, obs_glb, reward, cost, done, available_actions))
+            remote.send((ob, obs_glb, reward, done, cost, available_actions))
         elif cmd == 'reset':
             ob, obs_glb, available_actions = env.reset()
             remote.send((ob, obs_glb, available_actions))
@@ -369,7 +370,7 @@ class ShareSubprocVecEnv(ShareVecEnv):
     def step_wait(self):
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
-        obs, share_obs, rews, costs, dones,  available_actions = zip(*results)
+        obs, share_obs, rews, dones, costs,  available_actions = zip(*results)
 
         # print("=====cost_x=====: ", cost_x.sum())
         # print("=====np.stack(dones)=====: ", np.stack(dones))
@@ -406,8 +407,9 @@ def choosesimpleworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, obs_glb, reward, cost, done = env.step(data)
-            remote.send((ob, cost, done))
+            observe, reward, done, cost = env.step(data)
+            [ob, obs_glb] = observe
+            remote.send((ob, done, cost))
         elif cmd == 'reset':
             ob = env.reset(data)
             remote.send((ob))
@@ -500,8 +502,8 @@ def chooseworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, obs_glb, reward, cost, done, available_actions = env.step(data)
-            remote.send((ob, obs_glb, cost, done, available_actions))
+            ob, obs_glb, reward, done, cost, available_actions = env.step(data)
+            remote.send((ob, obs_glb, done, cost, available_actions))
         elif cmd == 'reset':
             ob, obs_glb, available_actions = env.reset(data)
             remote.send((ob, obs_glb, available_actions))
@@ -551,7 +553,7 @@ class ChooseSubprocVecEnv(ShareVecEnv):
     def step_wait(self):
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
-        obs, share_obs, rews, costs, dones,  available_actions = zip(*results)
+        obs, share_obs, rews, dones, costs,  available_actions = zip(*results)
         return np.stack(obs), np.stack(share_obs), np.stack(rews), np.stack(costs), np.stack(dones), np.stack(available_actions)
 
     def reset(self, reset_choose):
@@ -585,8 +587,9 @@ def chooseguardworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, obs_glb, reward, cost, done = env.step(data)
-            remote.send((ob, cost, done))
+            observe, reward, done, cost = env.step(data)
+            [ob, obs_glb] = observe
+            remote.send((ob, done, cost))
         elif cmd == 'reset':
             ob = env.reset(data)
             remote.send((ob))
@@ -719,7 +722,7 @@ class ShareDummyVecEnv(ShareVecEnv):
 
     def step_wait(self):
         results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
-        obs, share_obs, rews, costs, dones, available_actions = map(
+        obs, share_obs, rews, dones, costs, available_actions = map(
             np.array, zip(*results))
 
         for (i, done) in enumerate(dones):
@@ -731,7 +734,7 @@ class ShareDummyVecEnv(ShareVecEnv):
                     obs[i], share_obs[i], available_actions[i] = self.envs[i].reset()
         self.actions = None
 
-        return obs, share_obs, rews, costs, dones, available_actions
+        return obs, share_obs, rews, dones, costs, available_actions
 
     def reset(self):
         results = [env.reset() for env in self.envs]
@@ -765,10 +768,10 @@ class ChooseDummyVecEnv(ShareVecEnv):
 
     def step_wait(self):
         results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
-        obs, share_obs, rews, costs, dones,  available_actions = map(
+        obs, share_obs, rews, dones, costs,  available_actions = map(
             np.array, zip(*results))
         self.actions = None
-        return obs, share_obs, rews, costs, dones,  available_actions
+        return obs, share_obs, rews, dones, costs,  available_actions
 
     def reset(self, reset_choose):
         results = [env.reset(choose)

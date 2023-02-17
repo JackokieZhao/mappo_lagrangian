@@ -123,7 +123,7 @@ class MujocoRunner(object):
                     rnn_states_cost = self.collect(step)
 
                 # Obser reward cost and next obs
-                obs, share_obs, rewards, costs, dones, _ = self.envs.step(actions)
+                obs, share_obs, rewards, dones, costs, _ = self.envs.step(actions)
 
                 dones_env = np.all(dones, axis=1)
                 reward_env = np.mean(rewards, axis=1).flatten()
@@ -138,7 +138,7 @@ class MujocoRunner(object):
                         done_episodes_costs.append(train_episode_costs[t])
                         train_episode_costs[t] = 0
 
-                data = obs, share_obs, rewards, costs, dones, \
+                data = obs, share_obs, rewards, dones, costs, \
                     values, actions, action_log_probs, \
                     rnn_states, rnn_states_critic, cost_preds, rnn_states_cost  # fixme: it's important!!!
 
@@ -352,7 +352,7 @@ class MujocoRunner(object):
                 break
 
     def insert(self, data):
-        obs, share_obs, rewards, costs, dones, \
+        obs, share_obs, rewards, dones, costs, \
             values, actions, action_log_probs, rnn_states, rnn_states_critic, cost_preds, rnn_states_cost = data  #
 
         dones_env = np.all(dones, axis=1)

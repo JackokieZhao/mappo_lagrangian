@@ -3,7 +3,7 @@ import gym
 import numpy as np
 from gym.spaces import Box
 
-from .mujoco.ant import AntEnv
+from .mujoco.ant import AntEnv as Environment
 
 
 class TimeLimit(gym.Wrapper):
@@ -18,11 +18,12 @@ class TimeLimit(gym.Wrapper):
 
     def step(self, action):
         assert self._elapsed_steps is not None, "Cannot call env.step() before calling reset()"
-        obs, obs_glb, reward, cost, done = self.env.step(action)
+        observe, reward, done, cost = self.env.step(action)
+        [obs, obs_glb] = observe
         self._elapsed_steps += 1
         if self._elapsed_steps >= self._max_episode_steps:
             done = True
-        return obs, obs_glb, reward, cost, done
+        return obs, obs_glb, reward, done, cost
 
     def reset(self, **kwargs):
         self._elapsed_steps = 0
@@ -47,7 +48,7 @@ class NormalizedActions(gym.ActionWrapper):
         return action
 
 
-class MujocoMulti(object):
+class EnvironmentMulti(object):
 
     def __init__(self, env_args, n_agents=2, n_actions=4, n_obs=31, **kwargs):
         self.scenario = env_args.scenario  # e.g. Ant-v2
@@ -56,7 +57,7 @@ class MujocoMulti(object):
         self.eps_limit = env_args.eps_limit
 
         self.wrapped_env = NormalizedActions(
-            TimeLimit(AntEnv(env_args), max_episode_steps=self.eps_limit))
+            TimeLimit(Environment(env_args), max_episode_steps=self.eps_limit))
         self.timelimit_env = self.wrapped_env.env
         self.timelimit_env._max_episode_steps = self.eps_limit
         self.env = self.timelimit_env.env
@@ -76,37 +77,13 @@ class MujocoMulti(object):
 
         # need to remove dummy actions that arise due to unequal action vector sizes across agents
         flat_actions = np.concatenate([actions[i][:self.action_space[i].low.shape[0]] for i in range(self.n_agents)])
-        obs, obs_glb, reward, cost, done = self.wrapped_env.step(flat_actions)
+        obs, obs_glb, reward, done, cost = self.wrapped_env.step(flat_actions)
         self.steps += 1
 
         rewards = [[reward]] * self.n_agents
         costs = [[cost]] * self.n_agents
         dones = [done] * self.n_agents
-        return self.get_obs(), self.get_state(), rewards, costs, dones, self.get_avail_actions()
-
-    def get_obs(self):
-        """ Returns all agent observat3ions in a list """
-        state = self.env._get_obs()
-        obs_n = []
-        for a in range(self.n_agents):
-            agent_id_feats = np.zeros(self.n_agents, dtype=np.float32)
-            agent_id_feats[a] = 1.0
-            obs_i = np.concatenate([state, agent_id_feats])
-            obs_i = (obs_i - np.mean(obs_i)) / np.std(obs_i)
-            obs_n.append(obs_i)
-        return obs_n
-
-    def get_state(self, ):
-        # TODO: May want global states for different teams (so cannot see what the other team is communicating e.g.)
-        state = self.env._get_obs()
-        share_obs = []
-        for a in range(self.n_agents):
-            agent_id_feats = np.zeros(self.n_agents, dtype=np.float32)
-            agent_id_feats[a] = 1.0
-            state_i = np.concatenate([state, agent_id_feats])
-            state_i = (state_i - np.mean(state_i)) / np.std(state_i)
-            share_obs.append(state_i)
-        return share_obs
+        return obs, obs_glb, rewards, dones, costs, self.get_avail_actions()
 
     def get_avail_actions(self):  # all actions are always available
         return np.ones(shape=(self.n_agents, self.n_actions,))
@@ -115,7 +92,7 @@ class MujocoMulti(object):
         """ Returns initial observations and states"""
         self.steps = 0
         self.timelimit_env.reset()
-        return self.get_obs(), self.get_state(), self.get_avail_actions()
+        return self.env.get_obs(), self.env.get_obs(), self.get_avail_actions()
 
     def close(self):
         pass

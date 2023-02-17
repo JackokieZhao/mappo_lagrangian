@@ -40,7 +40,7 @@ def convert_observation_to_space(observation):
 
 
 class FDRAN(gym.Env, utils.EzPickle):
-    def __init__(self, sce_idx, device, configs) -> None:
+    def __init__(self, configs, sce_idx=1, device='cpu', ) -> None:
         """__init__: Initi function of the class.
 
         Args:
@@ -63,7 +63,7 @@ class FDRAN(gym.Env, utils.EzPickle):
 
         self._width = configs.width
         self._width_dim = configs.width_dim
-        self._M = configs.M
+        self._M = configs.n_agents
         self._K = configs.K
         self._N = configs.N
         self._N_chs = configs.n_chs
@@ -173,7 +173,7 @@ class FDRAN(gym.Env, utils.EzPickle):
         # Store the current state.
         self._steps = self._steps + 1
 
-        obs = np.array(self._get_obs())
+        obs = self._get_obs()
         obs_glb = self._get_obs_glb()
         done = self.check_terminate(actions)
         reward = self._reward
@@ -263,22 +263,7 @@ class FDRAN(gym.Env, utils.EzPickle):
         return self._bs_pos / self._width
 
     def _get_obs(self, ):
-
-        [gain, D, D_C, _] = self._state
-
-        obs_n = []
-        for m in range(self._M):
-            # INFO: Local observe for agent a.
-            # obs_a = torch.concat([gain[m, :]*D_C[m, :], D[m, :]], axis=0)
-            # obs_a = gain[m, :]*D[m, :]
-            obs_a = gain[m, :]*D_C[m, :]
-
-            # INFO: Global observe --> user positions.
-            agent_id_fea = torch.zeros(self._M, dtype=torch.float32)
-            agent_id_fea[m] = 1
-            obs_n.append(torch.concat([obs_a, agent_id_fea]).numpy())
-
-        return obs_n
+        return self._state[0]
 
     def get_record(self, ):
         return self.get_obs(), self._reward, self._cost, self._end

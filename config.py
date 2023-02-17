@@ -153,12 +153,15 @@ def get_config():
     """
     parser = argparse.ArgumentParser(
         description='mappo_lagrangian', formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    # INFO: Thread ===========================================================================
     parser.add_argument("--seed", type=int, default=1, help="Random seed for numpy/torch")
     parser.add_argument("--cuda", action='store_false', default=False,
                         help="by default True, will use GPU to train; or else will use CPU;")
     parser.add_argument("--cuda_deterministic",
                         action='store_false', default=True, help="by default, make sure random seed effective. if set, bypass such function.")
 
+    # INFO: Thread ===========================================================================
     parser.add_argument('--scenario', type=str, default='Ant-v2', help="Which mujoco task to run on")
     parser.add_argument("--alg", type=str,
                         default='mappo_lagr', choices=["mappo_lagr"])
@@ -174,9 +177,10 @@ def get_config():
     parser.add_argument("--use_obs_instead_of_state", action='store_true',
                         default=False, help="Whether to use global state or concatenated obs")
 
+    # INFO: Thread ===========================================================================
     parser.add_argument("--n_training_threads", type=int,
                         default=1, help="Number of torch threads for training")
-    parser.add_argument("--n_rollout_threads", type=int, default=32,
+    parser.add_argument("--n_rollout_threads", type=int, default=1,
                         help="Number of parallel envs for training rollouts")
     parser.add_argument("--n_eval_rollout_threads", type=int, default=2,
                         help="Number of parallel envs for evaluating rollouts")
@@ -188,11 +192,8 @@ def get_config():
     parser.add_argument("--eps_limit", type=int, default=200,
                         help="The gain # of last action layer")
 
-    # env parameters
-
-    parser.add_argument('--n_agents', type=int, default=2)
-    parser.add_argument("--M", type=int,
-                        default=10, help="Number of base stations.")
+    # INFO: ============================ Environment parameters. =============================
+    parser.add_argument('--n_agents', type=int, default=2, help="Number of base stations.")
     parser.add_argument("--N", type=int,
                         default=2, help="Number of ants in each base station.")
     parser.add_argument("--K", type=int,
@@ -211,7 +212,7 @@ def get_config():
                         default=0.01, help="The threshold for se improvement whether surve user.")
     parser.add_argument("--r_thr", type=float,
                         default=0.5, help="The rate threshold for every user.")
-    # network parameters
+    # INFO: ============================= network parameters =============================
     parser.add_argument("--share_policy", action='store_false',
                         default=False, help='Whether agent share the same policy')
     parser.add_argument("--use_centralized_V", action='store_false',
@@ -237,7 +238,7 @@ def get_config():
     parser.add_argument("--gain", type=float, default=0.01,
                         help="The gain # of last action layer")
 
-    # recurrent parameters
+    # INFO: ============================= recurrent parameters =============================
     parser.add_argument("--use_naive_recurrent_policy", action='store_true',
                         default=False, help='Whether to use a naive recurrent policy')
     parser.add_argument("--use_recurrent_policy", action='store_true',
@@ -246,7 +247,7 @@ def get_config():
     parser.add_argument("--data_chunk_length", type=int, default=10,
                         help="Time length of chunks used to train a recurrent_policy")
 
-    # optimizer parameters
+    # INFO: ============================= optimizer parameters =============================
     parser.add_argument("--lr", type=float, default=5e-4,
                         help='learning rate (default: 5e-4)')
     parser.add_argument("--critic_lr", type=float, default=5e-4,
@@ -256,8 +257,8 @@ def get_config():
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--std_x_coef", type=float, default=1)
     parser.add_argument("--std_y_coef", type=float, default=0.5)
-    
-    # ppo parameters
+
+    # INFO: ================================ ppo parameters ==================================
     parser.add_argument("--ppo_epoch", type=int, default=15,
                         help='number of ppo epochs (default: 15)')
     parser.add_argument("--use_clipped_value_loss",
@@ -268,7 +269,7 @@ def get_config():
                         help='number of batches for ppo (default: 1)')
     parser.add_argument("--entropy_coef", type=float, default=0.01,
                         help='entropy term coefficient (default: 0.01)')
-    # todo: lagrangian_coef is the lagrangian coefficient for mappo_lagrangian
+    # TODO: lagrangian_coef is the lagrangian coefficient for mappo_lagrangian
     parser.add_argument("--lamda_lagr", type=float, default=0.78,
                         help='lagrangrian coef coefficient (default: 0.78)')
     parser.add_argument("--lagrangian_coef_rate", type=float, default=5e-4,
@@ -298,7 +299,7 @@ def get_config():
                         action='store_false', default=True, help="by default True, whether to mask useless data in policy loss.")
     parser.add_argument("--huber_delta", type=float, default=10.0, help=" coefficience of huber loss.")
 
-    # run parameters
+    # INFO: run parameters
     parser.add_argument("--use_linear_lr_decay", action='store_true',
                         default=False, help='use a linear schedule on the learning rate')
     # save parameters
