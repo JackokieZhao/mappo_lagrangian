@@ -10,28 +10,27 @@ from gym import spaces, utils
 from gym.utils import seeding
 
 
-def convert_observation_to_space(observation):
-    if isinstance(observation, dict):
+def convert_observation_to_space(obs):
+    if isinstance(obs, dict):
         space = spaces.Dict(OrderedDict([
             (key, convert_observation_to_space(value))
-            for key, value in observation.items()
+            for key, value in obs.items()
         ]))
-    elif isinstance(observation, np.ndarray):
-        low = np.full(observation.shape, -float('inf'), dtype=np.float32)
-        high = np.full(observation.shape, float('inf'), dtype=np.float32)
-        space = spaces.Box(low, high, dtype=observation.dtype)
+    elif isinstance(obs, np.ndarray):
+        low = np.full(obs.shape, -float('inf'), dtype=np.float32)
+        high = np.full(obs.shape, float('inf'), dtype=np.float32)
+        space = spaces.Box(low, high, dtype=obs.dtype)
     else:
-        raise NotImplementedError(type(observation), observation)
+        raise NotImplementedError(type(obs), obs)
 
     return space
 
 
 class AntEnv(gym.Env, utils.EzPickle):
-    
     def __init__(self, kwargs):
         frame_skip = 5
         utils.EzPickle.__init__(self)
-
+        self.n_agents = 2
         fullpath = os.path.join(os.path.dirname(__file__), 'ant.xml')
         if not path.exists(fullpath):
             raise IOError("File %s does not exist" % fullpath)
@@ -51,21 +50,6 @@ class AntEnv(gym.Env, utils.EzPickle):
         self.seed()
 
     def step(self, actions):
-        """Run one timestep of the environment's dynamics. When end of
-        episode is reached, you are responsible for calling `reset()`
-        to reset this environment's state.
-
-        Accepts an action and returns a tuple (observation, reward, done, info).
-
-        Args:
-            action (object): an action provided by the agent
-
-        Returns:
-            observation (object): agent's observation of the current environment
-            reward (float) : amount of reward returned after previous action
-            done (bool): whether the episode has ended, in which case further step() calls will return undefined results
-            info (dict): contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
-        """
         xposbefore = self.data.get_body_xpos("torso")[0]
         self.sim.data.ctrl[:] = actions
         for _ in range(self.frame_skip):
@@ -105,12 +89,15 @@ class AntEnv(gym.Env, utils.EzPickle):
         done = not notdone
         done_cost = done * 1.0
         cost = np.clip(obj_cost + done_cost, 0, 1)
-        obs = self.get_obs()
-        obs_glb = obs
-        observation = [obs, obs_glb]
-        return [obs, obs_glb], reward, done, cost
+        ob = self._get_obs()
 
-    def get_obs(self):
+        rewards = [[reward]] * self.n_agents
+        costs = [[cost]] * self.n_agents
+        dones = [done] * self.n_agents
+        return ob, ob, rewards, costs, dones
+
+    def _get_obs(self):
+        
         x = self.sim.data.qpos.flat[0]
         y = self.sim.data.qpos.flat[1]
         if x < 20:
@@ -122,37 +109,21 @@ class AntEnv(gym.Env, utils.EzPickle):
         else:
             y_off = y - 20 * np.tan(30 / 360 * 2 * np.pi)
 
-        state = np.concatenate([
+        state =  np.concatenate([
             self.sim.data.qpos.flat[2:-42],
             self.sim.data.qvel.flat[:-36],
             [x / 5],
-            [y_off],
-            # np.clip(self.sim.data.cfrc_ext, -1, 1).flat,
-        ])
+            [y_off]])
 
-        obs_n = []
-        n_agents = 2
-        for a in range(n_agents):
-            agent_id_feats = np.zeros(n_agents, dtype=np.float32)
-            agent_id_feats[a] = 1.0
-            obs_i = np.concatenate([state, agent_id_feats])
-            obs_i = (obs_i - np.mean(obs_i)) / np.std(obs_i)
-            obs_n.append(obs_i)
-
-        return obs_n
-
-    def get_state(self, ):
-        # TODO: May want global states for different teams (so cannot see what the other team is communicating e.g.)
-        state = self.env._get_obs()
-        share_obs = []
+        obs = []
         for a in range(self.n_agents):
             agent_id_feats = np.zeros(self.n_agents, dtype=np.float32)
             agent_id_feats[a] = 1.0
-            state_i = np.concatenate([state, agent_id_feats])
-            state_i = (state_i - np.mean(state_i)) / np.std(state_i)
-            share_obs.append(state_i)
-        return share_obs
-
+            obs_i = np.concatenate([state, agent_id_feats])
+            obs_i = (obs_i - np.mean(obs_i)) / np.std(obs_i)
+            obs.append(obs_i)
+        return obs
+    
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
@@ -171,4 +142,35 @@ class AntEnv(gym.Env, utils.EzPickle):
         self.sim.set_state(new_state)
         self.sim.forward()
 
-        return self.get_obs()
+        return self._get_obs()
+
+    # def _get_obs(self):
+    #     x = self.sim.data.qpos.flat[0]
+    #     y = self.sim.data.qpos.flat[1]
+    #     if x < 20:
+    #         y_off = y - x * np.tan(30 / 360 * 2 * np.pi)
+    #     elif x > 20 and x < 60:
+    #         y_off = y + (x - 40) * np.tan(30 / 360 * 2 * np.pi)
+    #     elif x > 60 and x < 100:
+    #         y_off = y - (x - 80) * np.tan(30 / 360 * 2 * np.pi)
+    #     else:
+    #         y_off = y - 20 * np.tan(30 / 360 * 2 * np.pi)
+
+    #     state = np.concatenate([
+    #         self.sim.data.qpos.flat[2:-42],
+    #         self.sim.data.qvel.flat[:-36],
+    #         [x / 5],
+    #         [y_off]])
+
+    #     obs = []
+    #     for a in range(self.n_agents):
+    #         agent_id_feats = np.zeros(self.n_agents, dtype=np.float32)
+    #         agent_id_feats[a] = 1.0
+    #         obs_i = np.concatenate([state, agent_id_feats])
+    #         obs_i = (obs_i - np.mean(obs_i)) / np.std(obs_i)
+    #         obs.append(obs_i)
+
+    #     return obs
+
+    # def _get_obs_glb(self):
+    #     return self._get_obs()

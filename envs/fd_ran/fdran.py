@@ -23,24 +23,24 @@ from .compute import compute_se_lsfd_mmse
 from .positions import gen_bs_pos
 
 
-def convert_observation_to_space(observation):
-    if isinstance(observation, dict):
+def convert_observation_to_space(obs):
+    if isinstance(obs, dict):
         space = spaces.Dict(OrderedDict([
             (key, convert_observation_to_space(value))
-            for key, value in observation.items()
+            for key, value in obs.items()
         ]))
-    elif isinstance(observation, np.ndarray):
-        low = np.full(observation.shape, -float('inf'), dtype=np.float32)
-        high = np.full(observation.shape, float('inf'), dtype=np.float32)
-        space = spaces.Box(low, high, dtype=observation.dtype)
+    elif isinstance(obs, np.ndarray):
+        low = np.full(obs.shape, -float('inf'), dtype=np.float32)
+        high = np.full(obs.shape, float('inf'), dtype=np.float32)
+        space = spaces.Box(low, high, dtype=obs.dtype)
     else:
-        raise NotImplementedError(type(observation), observation)
+        raise NotImplementedError(type(obs), obs)
 
     return space
 
 
 class FDRAN(gym.Env, utils.EzPickle):
-    def __init__(self, configs, sce_idx=1, device='cpu', ) -> None:
+    def __init__(self, sce_idx, device, configs) -> None:
         """__init__: Initi function of the class.
 
         Args:
@@ -63,7 +63,7 @@ class FDRAN(gym.Env, utils.EzPickle):
 
         self._width = configs.width
         self._width_dim = configs.width_dim
-        self._M = configs.n_agents
+        self._M = configs.M
         self._K = configs.K
         self._N = configs.N
         self._N_chs = configs.n_chs
@@ -73,7 +73,6 @@ class FDRAN(gym.Env, utils.EzPickle):
 
         # INFO:  load scenario from scriptz
         self.eps_lim = configs.eps_limit
-        self._R_thr = configs.r_thr
 
         self._se = 0
         self._state_la = []
@@ -94,6 +93,7 @@ class FDRAN(gym.Env, utils.EzPickle):
         self._D = []
         self._R = []
         self._R_sqrt = []
+
         self._state = []
 
         self._R_dict = []
@@ -173,7 +173,7 @@ class FDRAN(gym.Env, utils.EzPickle):
         # Store the current state.
         self._steps = self._steps + 1
 
-        obs = self._get_obs()
+        obs = np.array(self._get_obs())
         obs_glb = self._get_obs_glb()
         done = self.check_terminate(actions)
         reward = self._reward
@@ -235,9 +235,7 @@ class FDRAN(gym.Env, utils.EzPickle):
 
         # TODO: Cost: ===========================================
         # self._cost = self._ratio * np.sum(np.abs(actions))
-        # self._cost = self._ratio * np.sum(np.abs(actions), 1)
-        se_dif = self._R_thr - se
-        self._cost = np.sum(se_dif[se_dif > 0])
+        self._cost = self._ratio * np.sum(np.abs(actions), 1)
 
     def _env_transfer(self, Gain, R, R_sqrt):
         # candidate ubs and pilot allocation.
@@ -260,10 +258,25 @@ class FDRAN(gym.Env, utils.EzPickle):
 
     def _get_obs_glb(self, ):
         """ Returns all agent observations in a list """
-        return self._bs_pos / self._width
+        return self._bs_pos
 
     def _get_obs(self, ):
-        return self._state[0]
+
+        [gain, D, D_C, _] = self._state
+
+        obs = []
+        for m in range(self._M):
+            # INFO: Local observe for agent a.
+            # obs_a = torch.concat([gain[m, :]*D_C[m, :], D[m, :]], axis=0)
+            # obs_a = gain[m, :]*D[m, :]
+            obs_a = gain[m, :]*D_C[m, :]
+
+            # INFO: Global observe --> user positions.
+            agent_id_fea = torch.zeros(self._M, dtype=torch.float32)
+            agent_id_fea[m] = 1
+            obs.append(torch.concat([obs_a, agent_id_fea]).numpy())
+
+        return obs
 
     def get_record(self, ):
         return self.get_obs(), self._reward, self._cost, self._end

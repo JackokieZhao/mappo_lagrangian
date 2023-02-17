@@ -15,5 +15,5 @@ logs
 .idea/
 .vscode/
 *.sw*
-/__pycache__
+
 /data
