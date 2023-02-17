@@ -90,8 +90,10 @@ class AntEnv(gym.Env, utils.EzPickle):
         done_cost = done * 1.0
         cost = np.clip(obj_cost + done_cost, 0, 1)
         ob = self._get_obs()
-        return ob, reward, cost, done
+        obs_glb = ob
+        return ob, obs_glb, reward, cost, done
 
+    
     def _get_obs(self):
         x = self.sim.data.qpos.flat[0]
         y = self.sim.data.qpos.flat[1]

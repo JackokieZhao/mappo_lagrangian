@@ -1,0 +1,46 @@
+mumu config:  Namespace(seed=1, cuda=False, cuda_deterministic=True, scenario='Ant-v2', alg='mappo_lagr', experiment_name='check', env_name='mujoco', agent_obsk=1, use_single_network=False, user_name='marl', use_wandb=False, use_obs_instead_of_state=False, n_training_threads=1, n_rollout_threads=32, n_eval_rollout_threads=2, n_render_rollout_threads=2, num_env_steps=10000000.0, eps_limit=200, n_agents=2, M=10, N=2, K=50, tau_p=10, n_chs=50, width=500, width_dim=250, p_max=200, se_inc_thr=0.01, r_thr=0.5, share_policy=False, use_centralized_V=True, stacked_frames=1, use_stacked_frames=False, hidden_size=64, layer_N=1, use_ReLU=True, use_popart=True, use_valuenorm=True, use_feature_normalization=True, use_orthogonal=True, gain=0.01, use_naive_recurrent_policy=False, use_recurrent_policy=False, recurrent_N=1, data_chunk_length=10, lr=0.0005, critic_lr=0.0005, opti_eps=1e-05, weight_decay=0, std_x_coef=1, std_y_coef=0.5, ppo_epoch=15, use_clipped_value_loss=True, clip_param=0.2, num_mini_batch=1, entropy_coef=0.01, lamda_lagr=0.78, lagrangian_coef_rate=0.0005, lagrangian_coef=0.01, value_loss_coef=1, use_max_grad_norm=True, max_grad_norm=10.0, use_gae=True, gamma=0.99, gae_lambda=0.95, use_proper_time_limits=False, use_huber_loss=True, use_value_active_masks=True, use_policy_active_masks=True, huber_delta=10.0, use_linear_lr_decay=False, save_interval=1, log_interval=5, use_eval=False, eval_interval=25, eval_episodes=32, model_dir=None, env_dir='./data/env/', safety_bound=1)
+cuda flag:  False Torch:  True
+choose to use cpu...
+share_observation_space:  [Box(31,), Box(31,)]
+observation_space:  [Box(31,), Box(31,)]
+action_space:  (Box(4,), Box(4,))
+
+ Scenario Ant-v2 Algo mappo_lagr Exp check updates 0/1562 episodes, total num timesteps 6400/10000000.0, FPS 1568.
+
+average_step_rewards is 0.4599649906158447.
+some episodes done, average rewards: 74.18801407305094, average costs: 0.45714285714285713
+
+ Scenario Ant-v2 Algo mappo_lagr Exp check updates 5/1562 episodes, total num timesteps 38400/10000000.0, FPS 1610.
+
+average_step_rewards is 0.48564398288726807.
+some episodes done, average rewards: 73.45954928027834, average costs: 2.35
+
+ Scenario Ant-v2 Algo mappo_lagr Exp check updates 10/1562 episodes, total num timesteps 70400/10000000.0, FPS 1622.
+
+average_step_rewards is 0.4871905446052551.
+some episodes done, average rewards: 77.00395340641009, average costs: 2.15
+
+ Scenario Ant-v2 Algo mappo_lagr Exp check updates 15/1562 episodes, total num timesteps 102400/10000000.0, FPS 1626.
+
+average_step_rewards is 0.4999629855155945.
+some episodes done, average rewards: 88.03798148784513, average costs: 4.594594594594595
+
+ Scenario Ant-v2 Algo mappo_lagr Exp check updates 20/1562 episodes, total num timesteps 134400/10000000.0, FPS 1627.
+
+average_step_rewards is 0.4997359812259674.
+some episodes done, average rewards: 86.88886778790382, average costs: 3.604651162790698
+
+ Scenario Ant-v2 Algo mappo_lagr Exp check updates 25/1562 episodes, total num timesteps 166400/10000000.0, FPS 1628.
+
+average_step_rewards is 0.5671697854995728.
+some episodes done, average rewards: 102.29694639600778, average costs: 4.088235294117647
+
+ Scenario Ant-v2 Algo mappo_lagr Exp check updates 30/1562 episodes, total num timesteps 198400/10000000.0, FPS 1629.
+
+average_step_rewards is 0.541825532913208.
+some episodes done, average rewards: 94.31945425359298, average costs: 4.3076923076923075
+
+ Scenario Ant-v2 Algo mappo_lagr Exp check updates 35/1562 episodes, total num timesteps 230400/10000000.0, FPS 1630.
+
+average_step_rewards is 0.5545666217803955.
+some episodes done, average rewards: 95.57624346523669, average costs: 1.6111111111111112

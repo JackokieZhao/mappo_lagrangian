@@ -1,3 +1,6 @@
+import numpy as np
+import torch
+
 from config import get_config
 from envs.fd_ran.fdran import FDRAN
 

@@ -73,6 +73,7 @@ class FDRAN(gym.Env, utils.EzPickle):
 
         # INFO:  load scenario from scriptz
         self.eps_lim = configs.eps_limit
+        self._R_thr = configs.r_thr
 
         self._se = 0
         self._state_la = []
@@ -93,7 +94,6 @@ class FDRAN(gym.Env, utils.EzPickle):
         self._D = []
         self._R = []
         self._R_sqrt = []
-
         self._state = []
 
         self._R_dict = []
@@ -180,7 +180,7 @@ class FDRAN(gym.Env, utils.EzPickle):
 
         return obs, obs_glb, reward, self._cost.sum(), done
 
-    def seed(self, seed = None):
+    def seed(self, seed=None):
         """
         The function takes in a seed and returns a seed
 
@@ -190,7 +190,7 @@ class FDRAN(gym.Env, utils.EzPickle):
         Returns:
           The seed is being returned.
         """
-        self.np_random, seed=seeding.np_random(seed)
+        self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
     def check_terminate(self, actions):
@@ -208,43 +208,45 @@ class FDRAN(gym.Env, utils.EzPickle):
         if np.sum(actions) == 0:
             self._actions_cont += 1
         else:
-            self._actions_cont=0
+            self._actions_cont = 0
 
         return self._actions_cont >= 3
 
     def _state_transfer(self, actions):
 
         # INFO: Update base station positions.
-        self._bs_pos=self._bs_pos + actions
+        self._bs_pos = self._bs_pos + actions
 
         # Acquire Gain, R, and R_sqrt.
         # bs_pos_ax = torch.floor(self._bs_pos[i])
-        pos_idx=self.pos2idx()
+        pos_idx = self.pos2idx()
 
-        gain=self._Gain_dict[pos_idx, :]
-        R=self._R_dict[:, :, pos_idx, :]
-        R_sqrt=self._R_sqrt_dict[:, :, pos_idx, :]
+        gain = self._Gain_dict[pos_idx, :]
+        R = self._R_dict[:, :, pos_idx, :]
+        R_sqrt = self._R_sqrt_dict[:, :, pos_idx, :]
 
-        [se, se_inc, D, D_C]=self._env_transfer(gain, R, R_sqrt)
+        [se, se_inc, D, D_C] = self._env_transfer(gain, R, R_sqrt)
 
-        self._state=[gain, D, D_C, self._bs_pos]
+        self._state = [gain, D, D_C, self._bs_pos]
 
         # TODO: Reward: =========================================
         # self._reward = torch.sum(se_inc, 1)
-        self._reward=se.sum()  # Share the reward
+        self._reward = se.sum()  # Share the reward
 
         # TODO: Cost: ===========================================
         # self._cost = self._ratio * np.sum(np.abs(actions))
-        self._cost=self._ratio * np.sum(np.abs(actions), 1)
+        # self._cost = self._ratio * np.sum(np.abs(actions), 1)
+        se_dif = self._R_thr - se
+        self._cost = np.sum(se_dif[se_dif > 0])
 
     def _env_transfer(self, Gain, R, R_sqrt):
         # candidate ubs and pilot allocation.
-        [D_C, pilot]=access_pilot(self._M, self._K, Gain, self._tau_p)
-        Hhat, H, C=chl_estimate(R, R_sqrt, self._N_chs, self._M, self._N,
+        [D_C, pilot] = access_pilot(self._M, self._K, Gain, self._tau_p)
+        Hhat, H, C = chl_estimate(R, R_sqrt, self._N_chs, self._M, self._N,
                                   self._K, self._tau_p, pilot, self._p_max)
 
         # Statistics for channels.
-        [gki_stat, gki2_stat, F_stat]=channel_statistics(
+        [gki_stat, gki2_stat, F_stat] = channel_statistics(
             Hhat, H, D_C, C, self._N_chs, self._M, self._N, self._K, self._p_max)
 
         # # Determine the access matrix for FD-RAN.
@@ -258,7 +260,7 @@ class FDRAN(gym.Env, utils.EzPickle):
 
     def _get_obs_glb(self, ):
         """ Returns all agent observations in a list """
-        return self._bs_pos
+        return self._bs_pos / self._width
 
     def _get_obs(self, ):
 

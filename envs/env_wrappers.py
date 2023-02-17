@@ -144,7 +144,7 @@ def worker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, reward, cost, done = env.step(data)
+            ob, obs_glb, reward, cost, done = env.step(data)
             if 'bool' in done.__class__.__name__:
                 if done:
                     ob = env.reset()
@@ -152,7 +152,7 @@ def worker(remote, parent_remote, env_fn_wrapper):
                 if np.all(done):
                     ob = env.reset()
 
-            remote.send((ob, reward, cost, done))
+            remote.send((ob, obs_glb, reward, cost, done))
         elif cmd == 'reset':
             ob = env.reset()
             remote.send((ob))
@@ -303,14 +303,14 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, s_ob, reward, cost, done, available_actions = env.step(data)
+            ob, obs_glb, reward, cost, done, available_actions = env.step(data)
             if np.all(np.array(done)):
-                ob, s_ob, available_actions = env.reset()
+                ob, obs_glb, available_actions = env.reset()
 
-            remote.send((ob, s_ob, reward, cost, done, available_actions))
+            remote.send((ob, obs_glb, reward, cost, done, available_actions))
         elif cmd == 'reset':
-            ob, s_ob, available_actions = env.reset()
-            remote.send((ob, s_ob, available_actions))
+            ob, obs_glb, available_actions = env.reset()
+            remote.send((ob, obs_glb, available_actions))
         elif cmd == 'reset_task':
             ob = env.reset_task()
             remote.send(ob)
@@ -406,7 +406,7 @@ def choosesimpleworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, reward, cost, done = env.step(data)
+            ob, obs_glb, reward, cost, done = env.step(data)
             remote.send((ob, cost, done))
         elif cmd == 'reset':
             ob = env.reset(data)
@@ -500,11 +500,11 @@ def chooseworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, s_ob, reward, cost, done, available_actions = env.step(data)
-            remote.send((ob, s_ob, cost, done, available_actions))
+            ob, obs_glb, reward, cost, done, available_actions = env.step(data)
+            remote.send((ob, obs_glb, cost, done, available_actions))
         elif cmd == 'reset':
-            ob, s_ob, available_actions = env.reset(data)
-            remote.send((ob, s_ob, available_actions))
+            ob, obs_glb, available_actions = env.reset(data)
+            remote.send((ob, obs_glb, available_actions))
         elif cmd == 'reset_task':
             ob = env.reset_task()
             remote.send(ob)
@@ -585,7 +585,7 @@ def chooseguardworker(remote, parent_remote, env_fn_wrapper):
     while True:
         cmd, data = remote.recv()
         if cmd == 'step':
-            ob, reward, cost, done = env.step(data)
+            ob, obs_glb, reward, cost, done = env.step(data)
             remote.send((ob, cost, done))
         elif cmd == 'reset':
             ob = env.reset(data)

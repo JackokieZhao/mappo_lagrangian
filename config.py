@@ -209,6 +209,8 @@ def get_config():
                         default=200, help="The maximum power for users.")
     parser.add_argument("--se_inc_thr", type=float,
                         default=0.01, help="The threshold for se improvement whether surve user.")
+    parser.add_argument("--r_thr", type=float,
+                        default=0.5, help="The rate threshold for every user.")
     # network parameters
     parser.add_argument("--share_policy", action='store_false',
                         default=False, help='Whether agent share the same policy')
@@ -254,7 +256,7 @@ def get_config():
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--std_x_coef", type=float, default=1)
     parser.add_argument("--std_y_coef", type=float, default=0.5)
-
+    
     # ppo parameters
     parser.add_argument("--ppo_epoch", type=int, default=15,
                         help='number of ppo epochs (default: 15)')
