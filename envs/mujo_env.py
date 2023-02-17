@@ -1,8 +1,4 @@
 
-import gym
-import numpy as np
-from gym.spaces import Box
-
 import os
 from collections import OrderedDict
 from os import path
@@ -12,6 +8,7 @@ import mujoco_py
 import mujoco_py as mjp
 import numpy as np
 from gym import spaces, utils
+from gym.spaces import Box
 from gym.utils import seeding
 
 
@@ -33,7 +30,7 @@ class NormalizedActions(gym.ActionWrapper):
         return action
 
 
-class MujocoMulti(object):
+class MujoEnv(object):
 
     def __init__(self, env_args, n_agents=2, n_actions=4, n_obs=31, **kwargs):
         self.scenario = env_args.scenario  # e.g. Ant-v2
@@ -68,18 +65,26 @@ class MujocoMulti(object):
                                         range(self.n_agents)]
 
         # COMPATIBILITY
-        self.observation_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
-                                             np.full(29, -float('inf'), dtype=np.float32)) for _ in range(self.n_agents)]
-        self.share_observation_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
-                                                   np.full(29, -float('inf'), dtype=np.float32)) for _ in
+        # self.observation_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
+        #                                      np.full(29, -float('inf'), dtype=np.float32)) for _ in range(self.n_agents)]
+        # self.share_observation_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
+        #                                            np.full(29, -float('inf'), dtype=np.float32)) for _ in
+        #                                 range(self.n_agents)]
+        # self.action_space = tuple([spaces.Box(low=np.full(8, -1, dtype=np.float32),
+        #                                       high=np.full(8, 1, dtype=np.float32)) for a in
+        #                            range(self.n_agents)])
+
+
+        self.observation_space = [Box(low=-10, high=10, shape=(self.obs_size,)) for _ in range(self.n_agents)]
+        self.share_observation_space = [Box(low=-10, high=10, shape=(self.share_obs_size,)) for _ in
                                         range(self.n_agents)]
-        self.action_space = tuple([spaces.Box(low=np.full(8, -1, dtype=np.float32),
-                                              high=np.full(8, 1, dtype=np.float32)) for a in
+        self.action_space = tuple([spaces.Box(low=np.full(self.n_actions, -1, dtype=np.float32),
+                                              high=np.full(self.n_actions, 1, dtype=np.float32)) for a in
                                    range(self.n_agents)])
 
-
-
-        self.step = 0
+        
+        
+        self.steps = 0
         self.seed()
         self.reset()
 

@@ -31,10 +31,11 @@ def get_config():
     parser.add_argument("--safety_bound", type=float, default=1, help="constraint upper bound")
 
     # INFO: ===========================================================================
-    parser.add_argument("--n_training_threads", type=int,
-                        default=1, help="Number of torch threads for training")
     parser.add_argument("--n_rollout_threads", type=int, default=32,
                         help="Number of parallel envs for training rollouts")
+    parser.add_argument("--n_training_threads", type=int,
+                        default=1, help="Number of torch threads for training")
+    
     parser.add_argument("--n_eval_rollout_threads", type=int, default=2,
                         help="Number of parallel envs for evaluating rollouts")
     parser.add_argument("--n_render_rollout_threads", type=int, default=2,

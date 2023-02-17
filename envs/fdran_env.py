@@ -17,10 +17,10 @@ import torch
 from gym import spaces, utils
 from gym.utils import seeding
 
-from .associate import access_pilot, semvs_associate
-from .channel import channel_statistics, chl_estimate
-from .compute import compute_se_lsfd_mmse
-from .positions import gen_bs_pos
+from .fd_ran.associate import access_pilot, semvs_associate
+from .fd_ran.channel import channel_statistics, chl_estimate
+from .fd_ran.compute import compute_se_lsfd_mmse
+from .fd_ran.positions import gen_bs_pos
 
 
 def convert_observation_to_space(obs):
@@ -39,7 +39,7 @@ def convert_observation_to_space(obs):
     return space
 
 
-class FDRAN(gym.Env, utils.EzPickle):
+class FdranEnv(gym.Env, utils.EzPickle):
     def __init__(self, sce_idx, device, configs) -> None:
         """__init__: Initi function of the class.
 

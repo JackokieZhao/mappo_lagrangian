@@ -11,9 +11,8 @@ import wandb
 
 from config import get_config
 from envs.env_wrappers import ShareDummyVecEnv, ShareSubprocVecEnv
-from envs.multi_envs import MujocoMulti
-
-# from envs.fd_ran.environment import Environment as MujocoMulti
+from envs.fd_ran import FdranEnv
+from envs.mujo_env import MujoEnv
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -21,7 +20,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 def make_env(all_args, n_thr):
     def get_env_fn(rank):
         def init_env():
-            env = MujocoMulti(env_args=all_args)
+            env = MujoEnv(env_args=all_args)
             env.seed(all_args.seed + rank * 1000)
             return env
         return init_env

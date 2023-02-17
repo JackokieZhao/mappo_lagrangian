@@ -1,5 +1,5 @@
 from config import get_config
-from envs.fd_ran.fdran import FDRAN
+from envs.fdran_env import FdranEnv
 
 if __name__ == '__main__':
     sce_idx = 1
@@ -7,4 +7,4 @@ if __name__ == '__main__':
     parser = get_config()
     cfgs = parser.parse_known_args()[0]
 
-    fd = FDRAN(sce_idx, device, cfgs)
+    fd = FdranEnv(sce_idx, device, cfgs)
