@@ -11,6 +11,8 @@ Modify standard PyTorch distributions so they to make compatible with this codeb
 #
 
 # Categorical
+
+
 class FixedCategorical(torch.distributions.Categorical):
     def sample(self):
         return super().sample().unsqueeze(-1)
@@ -57,15 +59,14 @@ class Categorical(nn.Module):
     def __init__(self, num_inputs, num_outputs, use_orthogonal=True, gain=0.01):
         super(Categorical, self).__init__()
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][use_orthogonal]
-        def init_(m): 
+
+        def init_(m):
             return init(m, init_method, lambda x: nn.init.constant_(x, 0), gain)
 
         self.linear = init_(nn.Linear(num_inputs, num_outputs))
 
-    def forward(self, x, available_actions=None):
+    def forward(self, x):
         x = self.linear(x)
-        if available_actions is not None:
-            x[available_actions == 0] = -1e10
         return FixedCategorical(logits=x)
 
 
@@ -80,7 +81,7 @@ class Categorical(nn.Module):
 #         self.fc_mean = init_(nn.Linear(num_inputs, num_outputs))
 #         self.logstd = AddBias(torch.zeros(num_outputs))
 #
-#     def forward(self, x, available_actions=None):
+#     def forward(self, x):
 #         action_mean = self.fc_mean(x)
 #
 #         #  An ugly hack for my KFAC implementation.
@@ -110,23 +111,26 @@ class DiagGaussian(nn.Module):
         log_std = torch.ones(num_outputs) * self.std_x_coef
         self.log_std = torch.nn.Parameter(log_std)
 
-    def forward(self, x, available_actions=None):
+    def forward(self, x):
         action_mean = self.fc_mean(x)
         action_std = torch.sigmoid(self.log_std / self.std_x_coef) * self.std_y_coef
         return FixedNormal(action_mean, action_std)
+
 
 class Bernoulli(nn.Module):
     def __init__(self, num_inputs, num_outputs, use_orthogonal=True, gain=0.01):
         super(Bernoulli, self).__init__()
         init_method = [nn.init.xavier_uniform_, nn.init.orthogonal_][use_orthogonal]
-        def init_(m): 
+
+        def init_(m):
             return init(m, init_method, lambda x: nn.init.constant_(x, 0), gain)
-        
+
         self.linear = init_(nn.Linear(num_inputs, num_outputs))
 
     def forward(self, x):
         x = self.linear(x)
         return FixedBernoulli(logits=x)
+
 
 class AddBias(nn.Module):
     def __init__(self, bias):

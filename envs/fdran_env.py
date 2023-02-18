@@ -23,22 +23,6 @@ from .fd_ran.compute import compute_se_lsfd_mmse
 from .fd_ran.positions import gen_bs_pos
 
 
-def convert_observation_to_space(obs):
-    if isinstance(obs, dict):
-        space = spaces.Dict(OrderedDict([
-            (key, convert_observation_to_space(value))
-            for key, value in obs.items()
-        ]))
-    elif isinstance(obs, np.ndarray):
-        low = np.full(obs.shape, -float('inf'), dtype=np.float32)
-        high = np.full(obs.shape, float('inf'), dtype=np.float32)
-        space = spaces.Box(low, high, dtype=obs.dtype)
-    else:
-        raise NotImplementedError(type(obs), obs)
-
-    return space
-
-
 class FdranEnv(gym.Env, utils.EzPickle):
     def __init__(self, configs, sce_idx=1, device='cpu') -> None:
         """__init__: Initi function of the class.
@@ -60,6 +44,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
         self._steps = 0
         self._ratio = 0.1
+        self.n_actions = 2
 
         self._pos_inc = configs.width / configs.width_dim
         self._width = configs.width
@@ -98,14 +83,17 @@ class FdranEnv(gym.Env, utils.EzPickle):
         self._actions_cont = 0
 
         # self._set_action_space()
-        self.action_space = spaces.Box(low=np.full(self.n_agents * 2, -10, dtype=np.float32),
-                                       high=np.full(self.n_agents * 2, 10, dtype=np.float32))
+        self.action_space = [spaces.Box(low=np.full(self.n_actions, -10, dtype=np.float32),
+                                        high=np.full(self.n_actions, 10, dtype=np.float32)) for a in
+                             range(self.n_agents)]
 
         # bs <---> user channel, bs index.
-        self.obs_space = spaces.Box(low=np.full(self._K + self.n_agents, -float('inf'), dtype=np.float32),
-                                    high=np.full(self._K + self.n_agents, float('inf'), dtype=np.float32))
-        self.obs_glb_space = spaces.Box(low=np.full(self.n_agents * 2, -float('inf'), dtype=np.float32),
-                                        high=np.full(self.n_agents * 2, float('inf'), dtype=np.float32))
+        self.obs_space = [spaces.Box(low=np.full(self._K + self.n_agents, -float('inf'), dtype=np.float32),
+                                     high=np.full(self._K + self.n_agents, float('inf'), dtype=np.float32)) for a in
+                          range(self.n_agents)]
+        self.obs_glb_space = [spaces.Box(low=np.full(self.n_agents * 3, -float('inf'), dtype=np.float32),
+                                         high=np.full(self.n_agents * 3, float('inf'), dtype=np.float32)) for a in
+                              range(self.n_agents)]
 
         self.seed()
 
@@ -140,8 +128,8 @@ class FdranEnv(gym.Env, utils.EzPickle):
         self._bs_pos = gen_bs_pos(self.n_agents, self._width, True, 0, 0)
 
         # Update the reset state.
-        self.step(np.zeros([self.n_agents, 2]))
-        return self._get_obs()
+        self.step(torch.zeros([self.n_agents, 2]))
+        return self._get_obs(), self._get_obs_glb(), torch.zeros([self.n_agents, self.n_actions])
 
     def pos2idx(self, ):
         """
@@ -176,9 +164,9 @@ class FdranEnv(gym.Env, utils.EzPickle):
         obs_glb = self._get_obs_glb()
         dones = np.ones([self.n_agents]) * self.check_terminate(actions)
         rewards = np.ones([self.n_agents, 1]) * self._reward
-        costs = np.ones([self.n_agents, 1]) * self._cost.sum()
+        costs = np.ones([self.n_agents, 1]) * self._cost
 
-        return obs, obs_glb, rewards, costs, dones
+        return obs, obs_glb, rewards, costs, dones, np.zeros([self.n_agents, self.n_actions])
 
     def check_terminate(self, actions):
         """
@@ -192,17 +180,30 @@ class FdranEnv(gym.Env, utils.EzPickle):
         Returns:
           The number of times the agent has not taken an action.
         """
-        if np.sum(actions) == 0:
+        if torch.sum(actions) == 0:
             self._actions_cont += 1
         else:
             self._actions_cont = 0
 
         return (self._actions_cont >= 3) | (self._steps >= self._eps_limit)
 
+    def _movement(self, actions):
+        pos_new = self._bs_pos + actions
+
+        lar_idx = pos_new >= self._width
+        sma_idx = pos_new < 0
+
+        cost_move = torch.sum((pos_new[lar_idx] - self._width) - pos_new[sma_idx])
+
+        pos_new[lar_idx] = self._width - 1e6
+        pos_new[sma_idx] = 0
+
+        return pos_new, cost_move
+
     def _state_transfer(self, actions):
 
         # INFO: Update base station positions.
-        self._bs_pos = self._bs_pos + actions
+        self._bs_pos, cost_move = self._movement(actions)
 
         # Acquire Gain, R, and R_sqrt.
         # bs_pos_ax = torch.floor(self._bs_pos[i])
@@ -222,7 +223,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
         # TODO: Cost: ===========================================
         # self._cost = self._ratio * np.sum(np.abs(actions))
-        self._cost = self._ratio * np.sum(np.abs(actions), 1)
+        self._cost = self._ratio * (torch.sum(torch.abs(actions)) + cost_move).numpy()
 
     def _env_transfer(self, Gain, R, R_sqrt):
         # candidate ubs and pilot allocation.

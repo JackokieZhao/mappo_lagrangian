@@ -212,7 +212,7 @@ class R_MAPPO_Lagr:
 
         obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, \
             value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, \
-            adv_targ, available_actions_batch, factor_batch, cost_preds_batch, cost_returns_barch, rnn_states_cost_batch, \
+            adv_targ, factor_batch, cost_preds_batch, cost_returns_barch, rnn_states_cost_batch, \
             cost_adv_targ, aver_episode_costs = sample
 
         old_action_log_probs_batch = check(old_action_log_probs_batch).to(**self.tpdv)
@@ -233,7 +233,6 @@ class R_MAPPO_Lagr:
                                                                                            rnn_states_critic_batch,
                                                                                            actions_batch,
                                                                                            masks_batch,
-                                                                                           available_actions_batch,
                                                                                            active_masks_batch,
                                                                                            rnn_states_cost_batch)
 

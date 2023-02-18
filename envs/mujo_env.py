@@ -83,7 +83,6 @@ class MujoEnv(object):
                                    range(self.n_agents)])
 
         
-        
         self.steps = 0
         self.seed()
         self.reset()
@@ -141,10 +140,8 @@ class MujoEnv(object):
 
         if self.steps >= self.eps_limit:
             self.reset()
-        return ob, ob, rewards, costs, dones, self.get_avail_actions()
+        return ob, ob, rewards, costs, dones
 
-    def get_avail_actions(self):  # all actions are always available
-        return np.ones(shape=(self.n_agents, self.n_actions,))
 
     def _get_obs(self):
 
@@ -189,7 +186,7 @@ class MujoEnv(object):
         self.sim.set_state(new_state)
         self.sim.forward()
 
-        return self._get_obs(), self._get_obs(), self.get_avail_actions()
+        return self._get_obs(), self._get_obs()
     
     def close(self):
         pass

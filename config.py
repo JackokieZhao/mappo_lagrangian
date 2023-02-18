@@ -47,7 +47,7 @@ def get_config():
                         help="The gain # of last action layer")
 
     # INFO: ============================ Environment parameters. =============================
-    parser.add_argument('--n_agents', type=int, default=10, help="Number of base stations.")
+    parser.add_argument('--n_agents', type=int, default=2, help="Number of base stations.")
     parser.add_argument("--N", type=int,
                         default=2, help="Number of ants in each base station.")
     parser.add_argument("--K", type=int,

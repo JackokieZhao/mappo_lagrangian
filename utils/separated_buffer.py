@@ -51,12 +51,6 @@ class SeparatedReplayBuffer(object):
         self.value_preds = np.zeros((self.eps_limit + 1, self.n_rollout_threads, 1), dtype=np.float32)
         self.returns = np.zeros((self.eps_limit + 1, self.n_rollout_threads, 1), dtype=np.float32)
 
-        if act_space.__class__.__name__ == 'Discrete':
-            self.available_actions = np.ones(
-                (self.eps_limit + 1, self.n_rollout_threads, act_space.n), dtype=np.float32)
-        else:
-            self.available_actions = None
-
         act_shape = get_shape_from_act_space(act_space)
 
         self.actions = np.zeros((self.eps_limit, self.n_rollout_threads, act_shape), dtype=np.float32)
@@ -82,7 +76,7 @@ class SeparatedReplayBuffer(object):
         self.aver_episode_costs = aver_episode_costs.copy()
 
     def insert(self, obs_glb, obs, rnn_states, rnn_states_critic, actions, action_log_probs,
-               value_preds, rewards, masks, bad_masks=None, active_masks=None, available_actions=None, costs=None,
+               value_preds, rewards, masks, bad_masks=None, active_masks=None, costs=None,
                cost_preds=None, rnn_states_cost=None, aver_episode_costs=0):
         self.obs_glb[self.step + 1] = obs_glb.copy()
         self.obs[self.step + 1] = obs.copy()
@@ -97,8 +91,6 @@ class SeparatedReplayBuffer(object):
             self.bad_masks[self.step + 1] = bad_masks.copy()
         if active_masks is not None:
             self.active_masks[self.step + 1] = active_masks.copy()
-        if available_actions is not None:
-            self.available_actions[self.step + 1] = available_actions.copy()
         if costs is not None:
             self.costs[self.step] = costs.copy()
         if cost_preds is not None:
@@ -109,7 +101,7 @@ class SeparatedReplayBuffer(object):
         self.step = (self.step + 1) % self.eps_limit
 
     def chooseinsert(self, obs_glb, obs, rnn_states, rnn_states_critic, actions, action_log_probs,
-                     value_preds, rewards, masks, bad_masks=None, active_masks=None, available_actions=None):
+                     value_preds, rewards, masks, bad_masks=None, active_masks=None):
         self.obs_glb[self.step] = obs_glb.copy()
         self.obs[self.step] = obs.copy()
         self.rnn_states[self.step + 1] = rnn_states.copy()
@@ -123,8 +115,6 @@ class SeparatedReplayBuffer(object):
             self.bad_masks[self.step + 1] = bad_masks.copy()
         if active_masks is not None:
             self.active_masks[self.step] = active_masks.copy()
-        if available_actions is not None:
-            self.available_actions[self.step] = available_actions.copy()
 
         self.step = (self.step + 1) % self.eps_limit
 
@@ -137,8 +127,6 @@ class SeparatedReplayBuffer(object):
         self.masks[0] = self.masks[-1].copy()
         self.bad_masks[0] = self.bad_masks[-1].copy()
         self.active_masks[0] = self.active_masks[-1].copy()
-        if self.available_actions is not None:
-            self.available_actions[0] = self.available_actions[-1].copy()
 
     def chooseafter_update(self):
         self.rnn_states[0] = self.rnn_states[-1].copy()
@@ -267,8 +255,6 @@ class SeparatedReplayBuffer(object):
         rnn_states_critic = self.rnn_states_critic[:-1].reshape(-1, *self.rnn_states_critic.shape[2:])
         rnn_states_cost = self.rnn_states_cost[:-1].reshape(-1, *self.rnn_states_cost.shape[2:])
         actions = self.actions.reshape(-1, self.actions.shape[-1])
-        if self.available_actions is not None:
-            available_actions = self.available_actions[:-1].reshape(-1, self.available_actions.shape[-1])
         value_preds = self.value_preds[:-1].reshape(-1, 1)
         returns = self.returns[:-1].reshape(-1, 1)
         cost_preds = self.cost_preds[:-1].reshape(-1, 1)
@@ -292,10 +278,6 @@ class SeparatedReplayBuffer(object):
             rnn_states_critic_batch = rnn_states_critic[indices]
             rnn_states_cost_batch = rnn_states_cost[indices]
             actions_batch = actions[indices]
-            if self.available_actions is not None:
-                available_actions_batch = available_actions[indices]
-            else:
-                available_actions_batch = None
             value_preds_batch = value_preds[indices]
             return_batch = returns[indices]
             cost_preds_batch = cost_preds[indices]
@@ -313,14 +295,14 @@ class SeparatedReplayBuffer(object):
                 cost_adv_targ = cost_adv[indices]
 
             if self.factor is None:
-                yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, available_actions_batch
+                yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ
             else:
                 if self.alg == "mappo_lagr":
                     factor_batch = factor[indices]
-                    yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, available_actions_batch, factor_batch, cost_preds_batch, cost_return_batch, rnn_states_cost_batch, cost_adv_targ, aver_episode_costs
+                    yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, factor_batch, cost_preds_batch, cost_return_batch, rnn_states_cost_batch, cost_adv_targ, aver_episode_costs
                 else:
                     factor_batch = factor[indices]
-                    yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, available_actions_batch, factor_batch
+                    yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, factor_batch
 
     def naive_recurrent_generator(self, advantages, num_mini_batch, cost_adv=None):
         n_rollout_threads = self.rewards.shape[1]
@@ -337,7 +319,6 @@ class SeparatedReplayBuffer(object):
             rnn_states_critic_batch = []
             rnn_states_cost_batch = []
             actions_batch = []
-            available_actions_batch = []
             value_preds_batch = []
             cost_preds_batch = []
             return_batch = []
@@ -356,8 +337,6 @@ class SeparatedReplayBuffer(object):
                 rnn_states_critic_batch.append(self.rnn_states_critic[0:1, ind])
                 rnn_states_cost_batch.append(self.rnn_states_cost[0:1, ind])
                 actions_batch.append(self.actions[:, ind])
-                if self.available_actions is not None:
-                    available_actions_batch.append(self.available_actions[:-1, ind])
                 value_preds_batch.append(self.value_preds[:-1, ind])
                 cost_preds_batch.append(self.cost_preds[:-1, ind])
                 return_batch.append(self.returns[:-1, ind])
@@ -377,8 +356,6 @@ class SeparatedReplayBuffer(object):
             obs_glb_batch = np.stack(obs_glb_batch, 1)
             obs_batch = np.stack(obs_batch, 1)
             actions_batch = np.stack(actions_batch, 1)
-            if self.available_actions is not None:
-                available_actions_batch = np.stack(available_actions_batch, 1)
             if self.factor is not None:
                 factor_batch = np.stack(factor_batch, 1)
             value_preds_batch = np.stack(value_preds_batch, 1)
@@ -401,10 +378,6 @@ class SeparatedReplayBuffer(object):
             obs_glb_batch = _flatten(T, N, obs_glb_batch)
             obs_batch = _flatten(T, N, obs_batch)
             actions_batch = _flatten(T, N, actions_batch)
-            if self.available_actions is not None:
-                available_actions_batch = _flatten(T, N, available_actions_batch)
-            else:
-                available_actions_batch = None
             if self.factor is not None:
                 factor_batch = _flatten(T, N, factor_batch)
             value_preds_batch = _flatten(T, N, value_preds_batch)
@@ -419,8 +392,8 @@ class SeparatedReplayBuffer(object):
                 cost_adv_targ = _flatten(T, N, cost_adv_targ)
             if self.factor is not None:
                 if self.alg == "mappo_lagr":
-                    yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, available_actions_batch, factor_batch, cost_preds_batch, cost_return_batch, rnn_states_cost_batch, cost_adv_targ  # 17 value
+                    yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, factor_batch, cost_preds_batch, cost_return_batch, rnn_states_cost_batch, cost_adv_targ  # 17 value
                 else:
-                    yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, available_actions_batch, factor_batch  # value
+                    yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, factor_batch  # value
             else:
-                yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ, available_actions_batch
+                yield obs_glb_batch, obs_batch, rnn_states_batch, rnn_states_critic_batch, actions_batch, value_preds_batch, return_batch, masks_batch, active_masks_batch, old_action_log_probs_batch, adv_targ

@@ -37,7 +37,7 @@ class MujocoRunner(Runner):
                 values, actions, action_log_probs, rnn_states, rnn_states_critic = self.collect(step)
 
                 # Obser reward and next obs
-                obs, obs_glb, rewards, dones,  _ = self.envs.step(actions)
+                obs, obs_glb, rewards, dones = self.envs.step(actions)
 
                 dones_env = np.all(dones, axis=1)
                 reward_env = np.mean(rewards, axis=1).flatten()
@@ -91,7 +91,7 @@ class MujocoRunner(Runner):
 
     def warmup(self):
         # reset env
-        obs, obs_glb, _ = self.envs.reset()
+        obs, obs_glb = self.envs.reset()
         # replay buffer
         if not self.use_centralized_V:
             obs_glb = obs
@@ -155,7 +155,7 @@ class MujocoRunner(Runner):
                                          rnn_states_critic[:, agent_id], actions[:, agent_id],
                                          action_log_probs[:, agent_id],
                                          values[:, agent_id], rewards[:, agent_id], masks[:, agent_id], None,
-                                         active_masks[:, agent_id], None)
+                                         active_masks[:, agent_id])
 
     def log_train(self, train_infos, total_num_steps):
         print("average_step_rewards is {}.".format(np.mean(self.buffer[0].rewards)))

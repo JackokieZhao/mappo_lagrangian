@@ -123,7 +123,7 @@ class MujocoRunner(object):
                     rnn_states_cost = self.collect(step)
 
                 # Obser reward cost and next obs
-                obs, obs_glb, rewards, costs, dones, _ = self.envs.step(actions)
+                obs, obs_glb, rewards, costs, dones = self.envs.step(actions)
                 dones_env = np.all(dones, axis=1)
                 reward_env = np.mean(rewards, axis=1).flatten()
                 cost_env = np.mean(costs, axis=1).flatten()
@@ -190,7 +190,7 @@ class MujocoRunner(object):
 
     def warmup(self):
         # reset env
-        obs, obs_glb, _ = self.envs.reset()
+        obs, obs_glb = self.envs.reset()
         # replay buffer
         if not self.use_centralized_V:
             obs_glb = obs
@@ -251,16 +251,11 @@ class MujocoRunner(object):
         for agent_id in torch.randperm(self.n_agents):
             self.trainer[agent_id].prep_training()
             self.buffer[agent_id].update_factor(factor)
-            available_actions = None if self.buffer[agent_id].available_actions is None \
-                else self.buffer[agent_id].available_actions[:-1].reshape(-1, *self.buffer[
-                    agent_id].available_actions.shape[
-                    2:])
             old_actions_logprob, _ = self.trainer[agent_id].policy.actor.evaluate_actions(
                 self.buffer[agent_id].obs[:-1].reshape(-1, *self.buffer[agent_id].obs.shape[2:]),
                 self.buffer[agent_id].rnn_states[0:1].reshape(-1, *self.buffer[agent_id].rnn_states.shape[2:]),
                 self.buffer[agent_id].actions.reshape(-1, *self.buffer[agent_id].actions.shape[2:]),
                 self.buffer[agent_id].masks[:-1].reshape(-1, *self.buffer[agent_id].masks.shape[2:]),
-                available_actions,
                 self.buffer[agent_id].active_masks[:-1].reshape(-1, *self.buffer[agent_id].active_masks.shape[2:]))
 
             # safe_buffer, cost_adv = self.buffer_filter(agent_id)
@@ -273,7 +268,6 @@ class MujocoRunner(object):
                 self.buffer[agent_id].rnn_states[0:1].reshape(-1, *self.buffer[agent_id].rnn_states.shape[2:]),
                 self.buffer[agent_id].actions.reshape(-1, *self.buffer[agent_id].actions.shape[2:]),
                 self.buffer[agent_id].masks[:-1].reshape(-1, *self.buffer[agent_id].masks.shape[2:]),
-                available_actions,
                 self.buffer[agent_id].active_masks[:-1].reshape(-1, *self.buffer[agent_id].active_masks.shape[2:]))
             factor = factor * _t2n(torch.exp(new_actions_logprob - old_actions_logprob).reshape(self.eps_limit,
                                                                                                 self.n_rollout_threads,
@@ -379,7 +373,7 @@ class MujocoRunner(object):
                                          rnn_states_critic[:, agent_id], actions[:, agent_id],
                                          action_log_probs[:, agent_id],
                                          values[:, agent_id], rewards[:, agent_id], masks[:, agent_id], None,
-                                         active_masks[:, agent_id], None, costs=costs[:, agent_id],
+                                         active_masks[:, agent_id], costs=costs[:, agent_id],
                                          cost_preds=cost_preds[:, agent_id],
                                          rnn_states_cost=rnn_states_cost[:, agent_id])
 
@@ -438,8 +432,6 @@ class MujocoRunner(object):
         buffer.rnn_states_cost = (buffer.rnn_states_cost, del_ids, 1)
         buffer.value_preds = (buffer.value_preds, del_ids, 1)
         buffer.returns = (buffer.returns, del_ids, 1)
-        if buffer.available_actions is not None:
-            buffer.available_actions = (buffer.available_actions, del_ids, 1)
         buffer.actions = (buffer.actions, del_ids, 1)
         buffer.action_log_probs = (buffer.action_log_probs, del_ids, 1)
         buffer.rewards = (buffer.rewards, del_ids, 1)

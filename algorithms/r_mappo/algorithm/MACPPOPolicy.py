@@ -51,7 +51,7 @@ class MACPPOPolicy:
         update_linear_schedule(self.critic_optimizer, episode, episodes, self.critic_lr)
         update_linear_schedule(self.cost_optimizer, episode, episodes, self.critic_lr)
 
-    def get_actions(self, cent_obs, obs, rnn_states_actor, rnn_states_critic, masks, available_actions=None,
+    def get_actions(self, cent_obs, obs, rnn_states_actor, rnn_states_critic, masks,
                     deterministic=False, rnn_states_cost=None):
         """
         Compute actions and value function predictions for the given inputs.
@@ -60,8 +60,7 @@ class MACPPOPolicy:
         :param rnn_states_actor: (np.ndarray) if actor is RNN, RNN states for actor.
         :param rnn_states_critic: (np.ndarray) if critic is RNN, RNN states for critic.
         :param masks: (np.ndarray) denotes points at which RNN states should be reset.
-        :param available_actions: (np.ndarray) denotes which actions are available to agent
-                                  (if None, all actions available)
+
         :param deterministic: (bool) whether the action should be mode of distribution or should be sampled.
 
         :return values: (torch.Tensor) value function predictions.
@@ -73,7 +72,6 @@ class MACPPOPolicy:
         actions, action_log_probs, rnn_states_actor = self.actor(obs,
                                                                  rnn_states_actor,
                                                                  masks,
-                                                                 available_actions,
                                                                  deterministic)
 
         values, rnn_states_critic = self.critic(cent_obs, rnn_states_critic, masks)
@@ -108,7 +106,7 @@ class MACPPOPolicy:
         return cost_preds
 
     def evaluate_actions(self, cent_obs, obs, rnn_states_actor, rnn_states_critic, action, masks,
-                         available_actions=None, active_masks=None, rnn_states_cost=None):
+                         active_masks=None, rnn_states_cost=None):
         """
         Get action logprobs / entropy and value function predictions for actor update.
         :param cent_obs (np.ndarray): centralized input to the critic.
@@ -117,8 +115,6 @@ class MACPPOPolicy:
         :param rnn_states_critic: (np.ndarray) if critic is RNN, RNN states for critic.
         :param action: (np.ndarray) actions whose log probabilites and entropy to compute.
         :param masks: (np.ndarray) denotes points at which RNN states should be reset.
-        :param available_actions: (np.ndarray) denotes which actions are available to agent
-                                  (if None, all actions available)
         :param active_masks: (torch.Tensor) denotes whether an agent is active or dead.
 
         :return values: (torch.Tensor) value function predictions.
@@ -129,7 +125,6 @@ class MACPPOPolicy:
                                                                      rnn_states_actor,
                                                                      action,
                                                                      masks,
-                                                                     available_actions,
                                                                      active_masks)
 
         values, _ = self.critic(cent_obs, rnn_states_critic, masks)
@@ -139,15 +134,13 @@ class MACPPOPolicy:
             cost_values, _ = self.cost_critic(cent_obs, rnn_states_cost, masks)
             return values, action_log_probs, dist_entropy, cost_values
 
-    def act(self, obs, rnn_states_actor, masks, available_actions=None, deterministic=False):
+    def act(self, obs, rnn_states_actor, masks,  deterministic=False):
         """
         Compute actions using the given inputs.
         :param obs (np.ndarray): local agent inputs to the actor.
         :param rnn_states_actor: (np.ndarray) if actor is RNN, RNN states for actor.
         :param masks: (np.ndarray) denotes points at which RNN states should be reset.
-        :param available_actions: (np.ndarray) denotes which actions are available to agent
-                                  (if None, all actions available)
         :param deterministic: (bool) whether the action should be mode of distribution or should be sampled.
         """
-        actions, _, rnn_states_actor = self.actor(obs, rnn_states_actor, masks, available_actions, deterministic)
+        actions, _, rnn_states_actor = self.actor(obs, rnn_states_actor, masks, deterministic)
         return actions, rnn_states_actor
