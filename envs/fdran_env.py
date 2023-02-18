@@ -128,8 +128,8 @@ class FdranEnv(gym.Env, utils.EzPickle):
         self._bs_pos = gen_bs_pos(self.n_agents, self._width, True, 0, 0)
 
         # Update the reset state.
-        self.step(torch.zeros([self.n_agents, 2]))
-        return self._get_obs(), self._get_obs_glb(), torch.zeros([self.n_agents, self.n_actions])
+        self.step(np.zeros([self.n_agents, 2]))
+        return self._get_obs(), self._get_obs_glb()
 
     def pos2idx(self, ):
         """
@@ -166,7 +166,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
         rewards = np.ones([self.n_agents, 1]) * self._reward
         costs = np.ones([self.n_agents, 1]) * self._cost
 
-        return obs, obs_glb, rewards, costs, dones, np.zeros([self.n_agents, self.n_actions])
+        return obs, obs_glb, rewards, costs, dones
 
     def check_terminate(self, actions):
         """
@@ -180,7 +180,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
         Returns:
           The number of times the agent has not taken an action.
         """
-        if torch.sum(actions) == 0:
+        if actions.sum() == 0:
             self._actions_cont += 1
         else:
             self._actions_cont = 0
@@ -193,9 +193,9 @@ class FdranEnv(gym.Env, utils.EzPickle):
         lar_idx = pos_new >= self._width
         sma_idx = pos_new < 0
 
-        cost_move = torch.sum((pos_new[lar_idx] - self._width) - pos_new[sma_idx])
+        cost_move = np.sum((pos_new[lar_idx] - self._width) - pos_new[sma_idx])
 
-        pos_new[lar_idx] = self._width - 1e6
+        pos_new[lar_idx] = self._width - 1e-6
         pos_new[sma_idx] = 0
 
         return pos_new, cost_move
@@ -207,7 +207,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
         # Acquire Gain, R, and R_sqrt.
         # bs_pos_ax = torch.floor(self._bs_pos[i])
-        pos_idx = self.pos2idx().numpy()
+        pos_idx = self.pos2idx()
 
         gain = self._Gain_dict[pos_idx, :]
         R = self._R_dict[:, :, pos_idx, :]
@@ -223,7 +223,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
         # TODO: Cost: ===========================================
         # self._cost = self._ratio * np.sum(np.abs(actions))
-        self._cost = self._ratio * (torch.sum(torch.abs(actions)) + cost_move).numpy()
+        self._cost = self._ratio * (np.sum(np.abs(actions)) + cost_move)
 
     def _env_transfer(self, Gain, R, R_sqrt):
         # candidate ubs and pilot allocation.
@@ -246,9 +246,9 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
     def _get_obs_glb(self, ):
         """ Returns all agent observations in a list """
-        bs_pos = torch.tile(self._bs_pos.flatten(), (self.n_agents, 1))
-        obs_glb = torch.concat([bs_pos, torch.eye(self.n_agents)], dim=1)
-        return obs_glb.numpy()
+        bs_pos = np.tile(self._bs_pos.flatten(), (self.n_agents, 1))
+        obs_glb = np.concatenate([bs_pos, torch.eye(self.n_agents)], axis=1)
+        return obs_glb
 
     def _get_obs(self, ):
         [gain, D, D_C, _] = self._state

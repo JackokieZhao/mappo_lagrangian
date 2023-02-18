@@ -15,7 +15,7 @@ def _t2n(x):
 class MujocoRunner(Runner):
     """Runner class to perform training, evaluation. and data collection for SMAC. See parent class for details."""
 
-    def __init__(self, config):
+    def __init__(self, config, *args):
         super(MujocoRunner, self).__init__(config)
 
     def run(self):

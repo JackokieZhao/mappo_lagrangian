@@ -58,7 +58,7 @@ def gen_bs_pos(M, squareLength, rand_pos=True, min_inter_dis=0, min_edge_dis=0):
             bs_pos = (torch.rand(M, 1) + 1j * torch.rand(M, 1)) * squareLength
 
     pos = torch.concat([bs_pos.real, bs_pos.imag], dim=1)
-    return pos
+    return pos.numpy()
 
 
 def gen_ues_pos(K, width, rand_ues_pos, bs_pos=None, min_ue_ubs_dis=None):
