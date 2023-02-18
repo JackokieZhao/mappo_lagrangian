@@ -20,39 +20,39 @@ class MujocoRunner(object):
     """Runner class to perform training, evaluation. and data collection for SMAC. See parent class for details."""
 
     def __init__(self, config):
-        self.all_args = config['all_args']
+        self.configs = config['configs']
         self.envs = config['envs']
         self.eval_envs = config['eval_envs']
         self.device = config['device']
         self.n_agents = config['n_agents']
 
         # parameters
-        self.env_name = self.all_args.env_name
-        self.alg = self.all_args.alg
-        self.experiment_name = self.all_args.experiment_name
-        self.use_centralized_V = self.all_args.use_centralized_V
-        self.use_obs_instead_of_state = self.all_args.use_obs_instead_of_state
-        self.num_env_steps = self.all_args.num_env_steps
-        self.eps_limit = self.all_args.eps_limit
-        self.n_rollout_threads = self.all_args.n_rollout_threads
-        self.n_eval_rollout_threads = self.all_args.n_eval_rollout_threads
-        self.use_linear_lr_decay = self.all_args.use_linear_lr_decay
-        self.hidden_size = self.all_args.hidden_size
-        self.use_wandb = self.all_args.use_wandb
-        self.recurrent_N = self.all_args.recurrent_N
-        self.use_single_network = self.all_args.use_single_network
+        self.env_name = self.configs.env_name
+        self.alg = self.configs.alg
+        self.experiment_name = self.configs.experiment_name
+        self.use_centralized_V = self.configs.use_centralized_V
+        self.use_obs_instead_of_state = self.configs.use_obs_instead_of_state
+        self.num_env_steps = self.configs.num_env_steps
+        self.eps_limit = self.configs.eps_limit
+        self.n_rollout_threads = self.configs.n_rollout_threads
+        self.n_eval_rollout_threads = self.configs.n_eval_rollout_threads
+        self.use_linear_lr_decay = self.configs.use_linear_lr_decay
+        self.hidden_size = self.configs.hidden_size
+        self.use_wandb = self.configs.use_wandb
+        self.recurrent_N = self.configs.recurrent_N
+        self.use_single_network = self.configs.use_single_network
         # interval
-        self.save_interval = self.all_args.save_interval
-        self.use_eval = self.all_args.use_eval
-        self.eval_interval = self.all_args.eval_interval
-        self.log_interval = self.all_args.log_interval
-        self.gamma = self.all_args.gamma
-        self.use_popart = self.all_args.use_popart
+        self.save_interval = self.configs.save_interval
+        self.use_eval = self.configs.use_eval
+        self.eval_interval = self.configs.eval_interval
+        self.log_interval = self.configs.log_interval
+        self.gamma = self.configs.gamma
+        self.use_popart = self.configs.use_popart
 
-        self.safety_bound = self.all_args.safety_bound
+        self.safety_bound = self.configs.safety_bound
 
         # dir
-        self.model_dir = self.all_args.model_dir
+        self.model_dir = self.configs.model_dir
 
         if self.use_wandb:
             self.save_dir = str(wandb.run.dir)
@@ -66,18 +66,18 @@ class MujocoRunner(object):
             if not os.path.exists(self.save_dir):
                 os.makedirs(self.save_dir)
 
-        print("share_observation_space: ", self.envs.share_observation_space)
-        print("observation_space: ", self.envs.observation_space)
+        print("obs_glb_space: ", self.envs.obs_glb_space)
+        print("obs_space: ", self.envs.obs_space)
         print("action_space: ", self.envs.action_space)
 
         self.policy = []
         for agent_id in range(self.n_agents):
-            share_observation_space = self.envs.share_observation_space[agent_id] if self.use_centralized_V else \
-                self.envs.observation_space[agent_id]
+            obs_glb_space = self.envs.obs_glb_space[agent_id] if self.use_centralized_V else \
+                self.envs.obs_space[agent_id]
             # policy network
-            po = Policy(self.all_args,
-                        self.envs.observation_space[agent_id],
-                        share_observation_space,
+            po = Policy(self.configs,
+                        self.envs.obs_space[agent_id],
+                        obs_glb_space,
                         self.envs.action_space[agent_id],
                         device=self.device)
             self.policy.append(po)
@@ -90,13 +90,13 @@ class MujocoRunner(object):
         # todo: revise this for trpo
         for agent_id in range(self.n_agents):
             # algorithm
-            tr = Trainalg(self.all_args, self.policy[agent_id], device=self.device)
+            tr = Trainalg(self.configs, self.policy[agent_id], device=self.device)
             # buffer
-            share_observation_space = self.envs.share_observation_space[agent_id] if self.use_centralized_V else \
-                self.envs.observation_space[agent_id]
-            bu = SeparatedReplayBuffer(self.all_args,
-                                       self.envs.observation_space[agent_id],
-                                       share_observation_space,
+            obs_glb_space = self.envs.obs_glb_space[agent_id] if self.use_centralized_V else \
+                self.envs.obs_space[agent_id]
+            bu = SeparatedReplayBuffer(self.configs,
+                                       self.envs.obs_space[agent_id],
+                                       obs_glb_space,
                                        self.envs.action_space[agent_id])
             self.buffer.append(bu)
             self.trainer.append(tr)
@@ -123,7 +123,7 @@ class MujocoRunner(object):
                     rnn_states_cost = self.collect(step)
 
                 # Obser reward cost and next obs
-                obs, share_obs, rewards, costs, dones, _ = self.envs.step(actions)
+                obs, obs_glb, rewards, costs, dones, _ = self.envs.step(actions)
                 dones_env = np.all(dones, axis=1)
                 reward_env = np.mean(rewards, axis=1).flatten()
                 cost_env = np.mean(costs, axis=1).flatten()
@@ -137,7 +137,7 @@ class MujocoRunner(object):
                         done_episodes_costs.append(train_episode_costs[t])
                         train_episode_costs[t] = 0
 
-                data = obs, share_obs, rewards, costs, dones, \
+                data = obs, obs_glb, rewards, costs, dones, \
                     values, actions, action_log_probs, \
                     rnn_states, rnn_states_critic, cost_preds, rnn_states_cost  # fixme: it's important!!!
 
@@ -158,7 +158,7 @@ class MujocoRunner(object):
             if episode % self.log_interval == 0:
                 end = time.time()
                 print("\n Scenario {} Algo {} Exp {} updates {}/{} episodes, total num timesteps {}/{}, FPS {}.\n"
-                      .format(self.all_args.scenario,
+                      .format(self.configs.scenario,
                               self.alg,
                               self.experiment_name,
                               episode,
@@ -190,14 +190,14 @@ class MujocoRunner(object):
 
     def warmup(self):
         # reset env
-        obs, share_obs, _ = self.envs.reset()
+        obs, obs_glb, _ = self.envs.reset()
         # replay buffer
         if not self.use_centralized_V:
-            share_obs = obs
+            obs_glb = obs
 
         for agent_id in range(self.n_agents):
-            # print(share_obs[:, agent_id])
-            self.buffer[agent_id].share_obs[0] = share_obs[:, agent_id].copy()
+            # print(obs_glb[:, agent_id])
+            self.buffer[agent_id].obs_glb[0] = obs_glb[:, agent_id].copy()
             self.buffer[agent_id].obs[0] = obs[:, agent_id].copy()
 
     @torch.no_grad()
@@ -216,7 +216,7 @@ class MujocoRunner(object):
         for agent_id in range(self.n_agents):
             self.trainer[agent_id].prep_rollout()
             value, action, action_log_prob, rnn_state, rnn_state_critic, cost_pred, rnn_state_cost \
-                = self.trainer[agent_id].policy.get_actions(self.buffer[agent_id].share_obs[step],
+                = self.trainer[agent_id].policy.get_actions(self.buffer[agent_id].obs_glb[step],
                                                             self.buffer[agent_id].obs[step],
                                                             self.buffer[agent_id].rnn_states[step],
                                                             self.buffer[agent_id].rnn_states_critic[step],
@@ -299,7 +299,7 @@ class MujocoRunner(object):
             one_episode_costs.append([])
             eval_episode_costs.append([])
 
-        eval_obs, eval_share_obs, _ = self.eval_envs.reset()
+        eval_obs, eval_obs_glb, _ = self.eval_envs.reset()
 
         eval_rnn_states = np.zeros((self.n_eval_rollout_threads, self.n_agents, self.recurrent_N, self.hidden_size),
                                    dtype=np.float32)
@@ -321,7 +321,7 @@ class MujocoRunner(object):
             eval_actions = np.array(eval_actions_collector).transpose(1, 0, 2)
 
             # Obser reward and next obs
-            eval_obs, eval_share_obs, eval_rewards, eval_costs, eval_dones, _ = self.eval_envs.step(
+            eval_obs, eval_obs_glb, eval_rewards, eval_costs, eval_dones, _ = self.eval_envs.step(
                 eval_actions)
             for eval_i in range(self.n_eval_rollout_threads):
                 one_episode_rewards[eval_i].append(eval_rewards[eval_i])
@@ -332,7 +332,7 @@ class MujocoRunner(object):
             eval_rnn_states[eval_dones_env == True] = np.zeros(
                 ((eval_dones_env == True).sum(), self.n_agents, self.recurrent_N, self.hidden_size), dtype=np.float32)
 
-            eval_masks = np.ones((self.all_args.n_eval_rollout_threads, self.n_agents, 1), dtype=np.float32)
+            eval_masks = np.ones((self.configs.n_eval_rollout_threads, self.n_agents, 1), dtype=np.float32)
             eval_masks[eval_dones_env == True] = np.zeros(((eval_dones_env == True).sum(), self.n_agents, 1),
                                                           dtype=np.float32)
 
@@ -342,7 +342,7 @@ class MujocoRunner(object):
                     eval_episode_rewards[eval_i].append(np.sum(one_episode_rewards[eval_i], axis=0))
                     one_episode_rewards[eval_i] = []
 
-            if eval_episode >= self.all_args.eval_episodes:
+            if eval_episode >= self.configs.eval_episodes:
                 eval_episode_rewards = np.concatenate(eval_episode_rewards)
                 eval_env_infos = {'eval_average_episode_rewards': eval_episode_rewards,
                                   'eval_max_episode_rewards': [np.max(eval_episode_rewards)]}
@@ -351,7 +351,7 @@ class MujocoRunner(object):
                 break
 
     def insert(self, data):
-        obs, share_obs, rewards, costs, dones, \
+        obs, obs_glb, rewards, costs, dones, \
             values, actions, action_log_probs, rnn_states, rnn_states_critic, cost_preds, rnn_states_cost = data  #
 
         dones_env = np.all(dones, axis=1)
@@ -372,10 +372,10 @@ class MujocoRunner(object):
         active_masks[dones_env == True] = np.ones(((dones_env == True).sum(), self.n_agents, 1), dtype=np.float32)
 
         if not self.use_centralized_V:
-            share_obs = obs
+            obs_glb = obs
 
         for agent_id in range(self.n_agents):
-            self.buffer[agent_id].insert(share_obs[:, agent_id], obs[:, agent_id], rnn_states[:, agent_id],
+            self.buffer[agent_id].insert(obs_glb[:, agent_id], obs[:, agent_id], rnn_states[:, agent_id],
                                          rnn_states_critic[:, agent_id], actions[:, agent_id],
                                          action_log_probs[:, agent_id],
                                          values[:, agent_id], rewards[:, agent_id], masks[:, agent_id], None,
@@ -387,13 +387,13 @@ class MujocoRunner(object):
     def compute(self):
         for agent_id in range(self.n_agents):
             self.trainer[agent_id].prep_rollout()
-            next_value = self.trainer[agent_id].policy.get_values(self.buffer[agent_id].share_obs[-1],
+            next_value = self.trainer[agent_id].policy.get_values(self.buffer[agent_id].obs_glb[-1],
                                                                   self.buffer[agent_id].rnn_states_critic[-1],
                                                                   self.buffer[agent_id].masks[-1])
             next_value = _t2n(next_value)
             self.buffer[agent_id].compute_returns(next_value, self.trainer[agent_id].value_normalizer)
 
-            next_costs = self.trainer[agent_id].policy.get_cost_values(self.buffer[agent_id].share_obs[-1],
+            next_costs = self.trainer[agent_id].policy.get_cost_values(self.buffer[agent_id].obs_glb[-1],
                                                                        self.buffer[agent_id].rnn_states_cost[-1],
                                                                        self.buffer[agent_id].masks[-1])
             next_costs = _t2n(next_costs)
@@ -431,7 +431,7 @@ class MujocoRunner(object):
 
     def remove_episodes(self, agent_id, del_ids):
         buffer = copy.deepcopy(self.buffer[agent_id])
-        buffer.share_obs = (buffer.share_obs, del_ids, 1)
+        buffer.obs_glb = (buffer.obs_glb, del_ids, 1)
         buffer.obs = (buffer.obs, del_ids, 1)
         buffer.rnn_states = (buffer.rnn_states, del_ids, 1)
         buffer.rnn_states_critic = (buffer.rnn_states_critic, del_ids, 1)

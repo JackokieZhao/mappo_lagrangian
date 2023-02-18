@@ -22,12 +22,12 @@ class MACPPOPolicy:
         self.weight_decay = args.weight_decay
 
         self.obs_space = obs_space
-        self.share_obs_space = cent_obs_space
+        self.obs_glb_space = cent_obs_space
         self.act_space = act_space
 
         self.actor = R_Actor(args, self.obs_space, self.act_space, self.device)
-        self.critic = R_Critic(args, self.share_obs_space, self.device)
-        self.cost_critic = R_Critic(args, self.share_obs_space, self.device)
+        self.critic = R_Critic(args, self.obs_glb_space, self.device)
+        self.cost_critic = R_Critic(args, self.obs_glb_space, self.device)
 
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
                                                 lr=self.lr, eps=self.opti_eps,

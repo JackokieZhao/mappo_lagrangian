@@ -35,7 +35,7 @@ def get_config():
                         help="Number of parallel envs for training rollouts")
     parser.add_argument("--n_training_threads", type=int,
                         default=1, help="Number of torch threads for training")
-    
+
     parser.add_argument("--n_eval_rollout_threads", type=int, default=2,
                         help="Number of parallel envs for evaluating rollouts")
     parser.add_argument("--n_render_rollout_threads", type=int, default=2,
@@ -47,11 +47,11 @@ def get_config():
                         help="The gain # of last action layer")
 
     # INFO: ============================ Environment parameters. =============================
-    parser.add_argument('--n_agents', type=int, default=2, help="Number of base stations.")
+    parser.add_argument('--n_agents', type=int, default=10, help="Number of base stations.")
     parser.add_argument("--N", type=int,
                         default=2, help="Number of ants in each base station.")
     parser.add_argument("--K", type=int,
-                        default=50, help="Number of users")
+                        default=20, help="Number of users")
     parser.add_argument("--tau_p", type=int,
                         default=10, help="Number of pilots.")
     parser.add_argument("--n_chs", type=int,

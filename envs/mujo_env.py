@@ -32,15 +32,15 @@ class NormalizedActions(gym.ActionWrapper):
 
 class MujoEnv(object):
 
-    def __init__(self, env_args, n_agents=2, n_actions=4, n_obs=31, **kwargs):
-        self.scenario = env_args.scenario  # e.g. Ant-v2
+    def __init__(self, configs, n_agents=2, n_actions=4, n_obs=31, **kwargs):
+        self.scenario = configs.scenario  # e.g. Ant-v2
         self.n_agents = n_agents
         self.n_actions = n_actions
-        self.agent_obsk = env_args.agent_obsk  # if None, fully observable else k>=0 implies observe nearest k agents or
-        self.eps_limit = env_args.eps_limit
+        self.agent_obsk = configs.agent_obsk  # if None, fully observable else k>=0 implies observe nearest k agents or
+        self.eps_limit = configs.eps_limit
 
         self.obs_size = n_obs
-        self.share_obs_size = n_obs
+        self.obs_glb_size = n_obs
 
         frame_skip = 5
         utils.EzPickle.__init__(self)
@@ -59,15 +59,15 @@ class MujoEnv(object):
         # self._set_action_space()
         self.action_space = spaces.Box(low=np.full(8, -1, dtype=np.float32),
                                        high=np.full(8, 1, dtype=np.float32))
-        self.observation_space = spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
+        self.obs_space = spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
                                             np.full(29, -float('inf'), dtype=np.float32))
-        self.share_observation_space = [Box(low=-10, high=10, shape=(self.share_obs_size,)) for _ in
+        self.obs_glb_space = [Box(low=-10, high=10, shape=(self.obs_glb_size,)) for _ in
                                         range(self.n_agents)]
 
         # COMPATIBILITY
-        # self.observation_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
+        # self.obs_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
         #                                      np.full(29, -float('inf'), dtype=np.float32)) for _ in range(self.n_agents)]
-        # self.share_observation_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
+        # self.obs_glb_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
         #                                            np.full(29, -float('inf'), dtype=np.float32)) for _ in
         #                                 range(self.n_agents)]
         # self.action_space = tuple([spaces.Box(low=np.full(8, -1, dtype=np.float32),
@@ -75,8 +75,8 @@ class MujoEnv(object):
         #                            range(self.n_agents)])
 
 
-        self.observation_space = [Box(low=-10, high=10, shape=(self.obs_size,)) for _ in range(self.n_agents)]
-        self.share_observation_space = [Box(low=-10, high=10, shape=(self.share_obs_size,)) for _ in
+        self.obs_space = [Box(low=-10, high=10, shape=(self.obs_size,)) for _ in range(self.n_agents)]
+        self.obs_glb_space = [Box(low=-10, high=10, shape=(self.obs_glb_size,)) for _ in
                                         range(self.n_agents)]
         self.action_space = tuple([spaces.Box(low=np.full(self.n_actions, -1, dtype=np.float32),
                                               high=np.full(self.n_actions, 1, dtype=np.float32)) for a in
@@ -133,9 +133,9 @@ class MujoEnv(object):
         cost = np.clip(obj_cost + done_cost, 0, 1)
         ob = self._get_obs()
 
-        rewards = [[reward]] * self.n_agents
-        costs = [[cost]] * self.n_agents
-        dones = [done] * self.n_agents
+        dones =np.ones([self.n_agents]) * done
+        rewards = np.ones([self.n_agents, 1]) * reward 
+        costs = np.ones([self.n_agents, 1]) * cost 
 
         self.steps += 1
 
@@ -172,7 +172,7 @@ class MujoEnv(object):
             obs_i = np.concatenate([state, agent_id_feats])
             obs_i = (obs_i - np.mean(obs_i)) / np.std(obs_i)
             obs.append(obs_i)
-        return obs
+        return np.array(obs)
     
     def reset(self):
         self.steps = 0

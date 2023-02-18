@@ -7,4 +7,4 @@ if __name__ == '__main__':
     parser = get_config()
     cfgs = parser.parse_known_args()[0]
 
-    fd = FdranEnv(sce_idx, device, cfgs)
+    fd = FdranEnv(cfgs, sce_idx, device)

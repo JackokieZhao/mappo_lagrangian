@@ -11,17 +11,17 @@ import wandb
 
 from config import get_config
 from envs.env_wrappers import ShareDummyVecEnv, ShareSubprocVecEnv
-from envs.fd_ran import FdranEnv
-from envs.mujo_env import MujoEnv
+# from envs.fdran_env import FdranEnv as Environment
+from envs.mujo_env import MujoEnv as Environment
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
-def make_env(all_args, n_thr):
+def make_env(configs, n_thr):
     def get_env_fn(rank):
         def init_env():
-            env = MujoEnv(env_args=all_args)
-            env.seed(all_args.seed + rank * 1000)
+            env = Environment(configs=configs)
+            env.seed(configs.seed + rank * 1000)
             return env
         return init_env
 
@@ -33,43 +33,43 @@ def make_env(all_args, n_thr):
 
 def main(args):
     parser = get_config()
-    all_args = parser.parse_known_args(args)[0]
-    print("mumu config: ", all_args)
+    configs = parser.parse_known_args(args)[0]
+    print("mumu config: ", configs)
 
-    if all_args.alg == "mappo_lagr":
-        all_args.share_policy = False
+    if configs.alg == "mappo_lagr":
+        configs.share_policy = False
     else:
         raise NotImplementedError
 
     # cuda
-    # all_args.cuda = True
-    if all_args.cuda and torch.cuda.is_available():
+    # configs.cuda = True
+    if configs.cuda and torch.cuda.is_available():
         print("choose to use gpu...")
         device = torch.device("cuda:0")
-        torch.set_num_threads(all_args.n_training_threads)
-        if all_args.cuda_deterministic:
+        torch.set_num_threads(configs.n_training_threads)
+        if configs.cuda_deterministic:
             torch.backends.cudnn.benchmark = False
             torch.backends.cudnn.deterministic = True
     else:
-        print("cuda flag: ", all_args.cuda, "Torch: ", torch.cuda.is_available())
+        print("cuda flag: ", configs.cuda, "Torch: ", torch.cuda.is_available())
         print("choose to use cpu...")
         device = torch.device("cpu")
-        torch.set_num_threads(all_args.n_training_threads)
+        torch.set_num_threads(configs.n_training_threads)
 
     run_dir = Path(os.path.split(os.path.dirname(os.path.abspath(__file__)))[
-        0] + "/results") / all_args.env_name / all_args.scenario / all_args.alg / all_args.experiment_name
+        0] + "/results") / configs.env_name / configs.scenario / configs.alg / configs.experiment_name
     if not run_dir.exists():
         os.makedirs(str(run_dir))
 
-    if all_args.use_wandb:
-        run = wandb.init(config=all_args,
-                         project=all_args.env_name,
-                         entity=all_args.user_name,
+    if configs.use_wandb:
+        run = wandb.init(config=configs,
+                         project=configs.env_name,
+                         entity=configs.user_name,
                          notes=socket.gethostname(),
-                         name=str(all_args.alg) + "_" +
-                         str(all_args.experiment_name) +
-                         "_seed" + str(all_args.seed),
-                         group=all_args.map_name,
+                         name=str(configs.alg) + "_" +
+                         str(configs.experiment_name) +
+                         "_seed" + str(configs.seed),
+                         group=configs.map_name,
                          dir=str(run_dir),
                          job_type="training",
                          reinit=True)
@@ -88,33 +88,33 @@ def main(args):
             os.makedirs(str(run_dir))
 
     setproctitle.setproctitle(
-        str(all_args.alg) + "-" + str(all_args.env_name) + "-" + str(all_args.experiment_name) + "@" + str(
-            all_args.user_name))
+        str(configs.alg) + "-" + str(configs.env_name) + "-" + str(configs.experiment_name) + "@" + str(
+            configs.user_name))
 
     # seed
-    torch.manual_seed(all_args.seed)
-    torch.cuda.manual_seed_all(all_args.seed)
-    np.random.seed(all_args.seed)
+    torch.manual_seed(configs.seed)
+    torch.cuda.manual_seed_all(configs.seed)
+    np.random.seed(configs.seed)
 
     # env
-    envs = make_env(all_args, all_args.n_rollout_threads)
-    eval_envs = make_env(all_args, all_args.n_eval_rollout_threads) if all_args.use_eval else None
+    envs = make_env(configs, configs.n_rollout_threads)
+    eval_envs = make_env(configs, configs.n_eval_rollout_threads) if configs.use_eval else None
 
     config = {
-        "all_args": all_args,
+        "configs": configs,
         "envs": envs,
         "eval_envs": eval_envs,
-        "n_agents": all_args.n_agents,
+        "n_agents": configs.n_agents,
         "device": device,
         "run_dir": run_dir
     }
 
     # TODO: run experiments
-    if all_args.share_policy:
+    if configs.share_policy:
         from runner.shared.mujoco_runner import MujocoRunner as Runner
     else:
         # in origin code not implement this method
-        if all_args.alg == "mappo_lagr":
+        if configs.alg == "mappo_lagr":
             from runner.mujoco_runner_mappo_lagr import MujocoRunner as Runner
         else:
             from runner.mujoco_runner import MujocoRunner as Runner
@@ -124,10 +124,10 @@ def main(args):
 
     # post process
     envs.close()
-    if all_args.use_eval and eval_envs is not envs:
+    if configs.use_eval and eval_envs is not envs:
         eval_envs.close()
 
-    if all_args.use_wandb:
+    if configs.use_wandb:
         run.finish()
     else:
         runner.writter.export_scalars_to_json(str(runner.log_dir + '/summary.json'))

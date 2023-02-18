@@ -45,8 +45,8 @@ class AntEnv(gym.Env, utils.EzPickle):
         # self._set_action_space()
         self.action_space = spaces.Box(low=np.full(8, -1, dtype=np.float32),
                                        high=np.full(8, 1, dtype=np.float32))
-        self.observation_space = spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
-                                            np.full(29, -float('inf'), dtype=np.float32))
+        self.obs_space = spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
+                                    np.full(29, -float('inf'), dtype=np.float32))
         self.seed()
 
     def step(self, actions):

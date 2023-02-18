@@ -63,12 +63,12 @@ class MujocoMulti(object):
         self.env = self.timelimit_env.env
         self.timelimit_env.reset()
         self.obs_size = n_obs
-        self.share_obs_size = n_obs
+        self.obs_glb_size = n_obs
 
         # COMPATIBILITY
         self.observation_space = [Box(low=-10, high=10, shape=(self.obs_size,)) for _ in range(self.n_agents)]
-        self.share_observation_space = [Box(low=-10, high=10, shape=(self.share_obs_size,)) for _ in
-                                        range(self.n_agents)]
+        self.obs_glb_space = [Box(low=-10, high=10, shape=(self.obs_glb_size,)) for _ in
+                              range(self.n_agents)]
         self.action_space = tuple([Box(self.env.action_space.low[:self.n_actions],
                                        self.env.action_space.high[:self.n_actions]) for a in
                                    range(self.n_agents)])
@@ -80,7 +80,7 @@ class MujocoMulti(object):
         obs, obs_glb, rewards, costs, dones = self.wrapped_env.step(flat_actions)
         self.steps += 1
 
-        return obs, obs, rewards, costs, dones, self.get_avail_actions()
+        return obs, obs_glb, rewards, costs, dones, self.get_avail_actions()
 
     def get_avail_actions(self):  # all actions are always available
         return

@@ -40,7 +40,7 @@ def convert_observation_to_space(obs):
 
 
 class FdranEnv(gym.Env, utils.EzPickle):
-    def __init__(self, sce_idx, device, configs) -> None:
+    def __init__(self, configs, sce_idx=1, device='cpu') -> None:
         """__init__: Initi function of the class.
 
         Args:
@@ -56,14 +56,15 @@ class FdranEnv(gym.Env, utils.EzPickle):
         # INFO: Multiple
         self._device = device
         self._sce_idx = sce_idx
+        self._load_envs(configs.env_dir, sce_idx, configs.K)
+
         self._steps = 0
         self._ratio = 0.1
 
         self._pos_inc = configs.width / configs.width_dim
-
         self._width = configs.width
         self._width_dim = configs.width_dim
-        self._M = configs.M
+        self.n_agents = configs.n_agents
         self._K = configs.K
         self._N = configs.N
         self._N_chs = configs.n_chs
@@ -72,7 +73,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
         self._se_inc_thr = configs.se_inc_thr
 
         # INFO:  load scenario from scriptz
-        self.eps_lim = configs.eps_limit
+        self._eps_limit = configs.eps_limit
 
         self._se = 0
         self._state_la = []
@@ -88,46 +89,42 @@ class FdranEnv(gym.Env, utils.EzPickle):
         self._ues_pos = []
         self._bs_pos = []
 
-        self._Gain = []
         self._SE = []
         self._D = []
         self._R = []
         self._R_sqrt = []
-
         self._state = []
 
-        self._R_dict = []
-        self._R_sqrt_dict = []
-        self._Gain_dict = []
         self._actions_cont = 0
 
-        self._load_envs(configs.env_dir, sce_idx)
-
         # self._set_action_space()
-        self.action_space = spaces.Box(low=np.full(self._M * 2, -10, dtype=np.float32),
-                                       high=np.full(self._M * 2, 10, dtype=np.float32))
+        self.action_space = spaces.Box(low=np.full(self.n_agents * 2, -10, dtype=np.float32),
+                                       high=np.full(self.n_agents * 2, 10, dtype=np.float32))
 
         # bs <---> user channel, bs index.
-        self.obs_space = spaces.Box(low=np.full(self._K + self._M, -float('inf'), dtype=np.float32),
-                                    high=np.full(self._K + self._M, float('inf'), dtype=np.float32))
-        self.obs_glb_space = spaces.Box(low=np.full(self._M * 2, -float('inf'), dtype=np.float32),
-                                        high=np.full(self._M * 2, float('inf'), dtype=np.float32))
+        self.obs_space = spaces.Box(low=np.full(self._K + self.n_agents, -float('inf'), dtype=np.float32),
+                                    high=np.full(self._K + self.n_agents, float('inf'), dtype=np.float32))
+        self.obs_glb_space = spaces.Box(low=np.full(self.n_agents * 2, -float('inf'), dtype=np.float32),
+                                        high=np.full(self.n_agents * 2, float('inf'), dtype=np.float32))
 
         self.seed()
 
         # reset for the environment.
         self.reset()
 
-    def _load_envs(self, env_dir, env_idx):
+    def _load_envs(self, env_dir, env_idx, K):
 
         # Load environment.
         env_file = env_dir + 'result_' + str(env_idx) + '.mat'
         data = mat.loadmat(env_file)    # ues_pos, bs_pos, R, R_sqrt, gain
 
-        self._ues_pos = torch.tensor(data['ues_pos'])
-        self._R_dict = torch.tensor(data['R'])
-        self._R_sqrt_dict = torch.tensor(data['R_sqrt'])
-        self._Gain_dict = torch.tensor(data['gain'])
+        ues_pos_tot = torch.tensor(data['ues_pos'])
+        ues_idx = np.random.randint(0, len(ues_pos_tot), size=K)
+
+        self._ues_pos = torch.tensor(np.column_stack([ues_pos_tot[ues_idx].real, ues_pos_tot[ues_idx].imag]))
+        self._R_dict = torch.tensor(data['R'])[..., ues_idx]
+        self._R_sqrt_dict = torch.tensor(data['R_sqrt'])[..., ues_idx]
+        self._Gain_dict = torch.tensor(data['gain'])[..., ues_idx]
 
     def reset(self, ):
         """
@@ -139,10 +136,11 @@ class FdranEnv(gym.Env, utils.EzPickle):
         """
         # position reset.
         self._steps = 0
-        self._bs_pos = gen_bs_pos(self._M, self._width, True, 0, 0)
+
+        self._bs_pos = gen_bs_pos(self.n_agents, self._width, True, 0, 0)
 
         # Update the reset state.
-        self.step(np.zeros([self._M, 2]))
+        self.step(np.zeros([self.n_agents, 2]))
         return self._get_obs()
 
     def pos2idx(self, ):
@@ -173,25 +171,14 @@ class FdranEnv(gym.Env, utils.EzPickle):
         # Store the current state.
         self._steps = self._steps + 1
 
-        obs = np.array(self._get_obs())
+        # Compute the return values.
+        obs = self._get_obs()
         obs_glb = self._get_obs_glb()
-        done = self.check_terminate(actions)
-        reward = self._reward
+        dones = np.ones([self.n_agents]) * self.check_terminate(actions)
+        rewards = np.ones([self.n_agents, 1]) * self._reward
+        costs = np.ones([self.n_agents, 1]) * self._cost.sum()
 
-        return obs, obs_glb, reward, self._cost.sum(), done
-
-    def seed(self, seed=None):
-        """
-        The function takes in a seed and returns a seed
-
-        Args:
-          seed: Seed for the random number generator (if None, a random seed will be used).
-
-        Returns:
-          The seed is being returned.
-        """
-        self.np_random, seed = seeding.np_random(seed)
-        return [seed]
+        return obs, obs_glb, rewards, costs, dones
 
     def check_terminate(self, actions):
         """
@@ -210,7 +197,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
         else:
             self._actions_cont = 0
 
-        return self._actions_cont >= 3
+        return (self._actions_cont >= 3) | (self._steps >= self._eps_limit)
 
     def _state_transfer(self, actions):
 
@@ -219,7 +206,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
         # Acquire Gain, R, and R_sqrt.
         # bs_pos_ax = torch.floor(self._bs_pos[i])
-        pos_idx = self.pos2idx()
+        pos_idx = self.pos2idx().numpy()
 
         gain = self._Gain_dict[pos_idx, :]
         R = self._R_dict[:, :, pos_idx, :]
@@ -239,16 +226,16 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
     def _env_transfer(self, Gain, R, R_sqrt):
         # candidate ubs and pilot allocation.
-        [D_C, pilot] = access_pilot(self._M, self._K, Gain, self._tau_p)
-        Hhat, H, C = chl_estimate(R, R_sqrt, self._N_chs, self._M, self._N,
+        [D_C, pilot] = access_pilot(self.n_agents, self._K, Gain, self._tau_p)
+        Hhat, H, C = chl_estimate(R, R_sqrt, self._N_chs, self.n_agents, self._N,
                                   self._K, self._tau_p, pilot, self._p_max)
 
         # Statistics for channels.
         [gki_stat, gki2_stat, F_stat] = channel_statistics(
-            Hhat, H, D_C, C, self._N_chs, self._M, self._N, self._K, self._p_max)
+            Hhat, H, D_C, C, self._N_chs, self.n_agents, self._N, self._K, self._p_max)
 
         # # Determine the access matrix for FD-RAN.
-        [D, se_inc] = semvs_associate(self._se_inc_thr, self._M, self._K, self._tau_p,
+        [D, se_inc] = semvs_associate(self._se_inc_thr, self.n_agents, self._K, self._tau_p,
                                       D_C, gki_stat, gki2_stat, F_stat, self._p_max)
 
         # Compute spectrum efficiency.
@@ -258,25 +245,15 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
     def _get_obs_glb(self, ):
         """ Returns all agent observations in a list """
-        return self._bs_pos
+        bs_pos = torch.tile(self._bs_pos.flatten(), (self.n_agents, 1))
+        obs_glb = torch.concat([bs_pos, torch.eye(self.n_agents)], dim=1)
+        return obs_glb.numpy()
 
     def _get_obs(self, ):
-
         [gain, D, D_C, _] = self._state
-
-        obs = []
-        for m in range(self._M):
-            # INFO: Local observe for agent a.
-            # obs_a = torch.concat([gain[m, :]*D_C[m, :], D[m, :]], axis=0)
-            # obs_a = gain[m, :]*D[m, :]
-            obs_a = gain[m, :]*D_C[m, :]
-
-            # INFO: Global observe --> user positions.
-            agent_id_fea = torch.zeros(self._M, dtype=torch.float32)
-            agent_id_fea[m] = 1
-            obs.append(torch.concat([obs_a, agent_id_fea]).numpy())
-
-        return obs
+        gain_ = torch.multiply(gain, D_C)
+        obs = torch.concat([gain_, torch.eye(self.n_agents)], dim=1)
+        return obs.numpy()
 
     def get_record(self, ):
         return self.get_obs(), self._reward, self._cost, self._end
@@ -349,3 +326,16 @@ class FdranEnv(gym.Env, utils.EzPickle):
             self._ues_pos = pos
         else:
             self._ues_pos[idx] = pos
+
+    def seed(self, seed=None):
+        """
+        The function takes in a seed and returns a seed
+
+        Args:
+          seed: Seed for the random number generator (if None, a random seed will be used).
+
+        Returns:
+          The seed is being returned.
+        """
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]

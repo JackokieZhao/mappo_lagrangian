@@ -40,10 +40,10 @@ class ShareVecEnv(ABC):
         'render.modes': ['human', 'rgb_array']
     }
 
-    def __init__(self, num_envs, observation_space, share_observation_space, action_space):
+    def __init__(self, num_envs, obs_space, obs_glb_space, action_space):
         self.num_envs = num_envs
-        self.observation_space = observation_space
-        self.share_observation_space = share_observation_space
+        self.obs_space = obs_space
+        self.obs_glb_space = obs_glb_space
         self.action_space = action_space
 
     @abstractmethod
@@ -170,7 +170,7 @@ def worker(remote, parent_remote, env_fn_wrapper):
             remote.close()
             break
         elif cmd == 'get_spaces':
-            remote.send((env.observation_space, env.share_observation_space, env.action_space))
+            remote.send((env.obs_space, env.obs_glb_space, env.action_space))
         else:
             raise NotImplementedError
 
@@ -193,9 +193,9 @@ class GuardSubprocVecEnv(ShareVecEnv):
             remote.close()
 
         self.remotes[0].send(('get_spaces', None))
-        observation_space, share_observation_space, action_space = self.remotes[0].recv()
-        ShareVecEnv.__init__(self, len(env_fns), observation_space,
-                             share_observation_space, action_space)
+        obs_space, obs_glb_space, action_space = self.remotes[0].recv()
+        ShareVecEnv.__init__(self, len(env_fns), obs_space,
+                             obs_glb_space, action_space)
 
     def step_async(self, actions):
 
@@ -251,9 +251,9 @@ class SubprocVecEnv(ShareVecEnv):
             remote.close()
 
         self.remotes[0].send(('get_spaces', None))
-        observation_space, share_observation_space, action_space = self.remotes[0].recv()
-        ShareVecEnv.__init__(self, len(env_fns), observation_space,
-                             share_observation_space, action_space)
+        obs_space, obs_glb_space, action_space = self.remotes[0].recv()
+        ShareVecEnv.__init__(self, len(env_fns), obs_space,
+                             obs_glb_space, action_space)
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
@@ -326,7 +326,7 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
             break
         elif cmd == 'get_spaces':
             remote.send(
-                (env.observation_space, env.share_observation_space, env.action_space))
+                (env.obs_space, env.obs_glb_space, env.action_space))
         elif cmd == 'render_vulnerability':
             fr = env.render_vulnerability(data)
             remote.send((fr))
@@ -355,11 +355,11 @@ class ShareSubprocVecEnv(ShareVecEnv):
         self.remotes[0].send(('get_n_agents', None))
         self.n_agents = self.remotes[0].recv()
         self.remotes[0].send(('get_spaces', None))
-        observation_space, share_observation_space, action_space = self.remotes[0].recv(
+        obs_space, obs_glb_space, action_space = self.remotes[0].recv(
         )
-        # print("wrapper:", share_observation_space)
-        ShareVecEnv.__init__(self, len(env_fns), observation_space,
-                             share_observation_space, action_space)
+        # print("wrapper:", obs_glb_space)
+        ShareVecEnv.__init__(self, len(env_fns), obs_space,
+                             obs_glb_space, action_space)
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
@@ -369,18 +369,18 @@ class ShareSubprocVecEnv(ShareVecEnv):
     def step_wait(self):
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
-        obs, share_obs, rews, costs, dones,  available_actions = zip(*results)
+        obs, obs_glb, rews, costs, dones,  available_actions = zip(*results)
 
         # print("=====cost_x=====: ", cost_x.sum())
         # print("=====np.stack(dones)=====: ", np.stack(dones))
-        return np.stack(obs), np.stack(share_obs), np.stack(rews), np.stack(costs), np.stack(dones), np.stack(available_actions)
+        return np.stack(obs), np.stack(obs_glb), np.stack(rews), np.stack(costs), np.stack(dones), np.stack(available_actions)
 
     def reset(self):
         for remote in self.remotes:
             remote.send(('reset', None))
         results = [remote.recv() for remote in self.remotes]
-        obs, share_obs, available_actions = zip(*results)
-        return np.stack(obs), np.stack(share_obs), np.stack(available_actions)
+        obs, obs_glb, available_actions = zip(*results)
+        return np.stack(obs), np.stack(obs_glb), np.stack(available_actions)
 
     def reset_task(self):
         for remote in self.remotes:
@@ -426,7 +426,7 @@ def choosesimpleworker(remote, parent_remote, env_fn_wrapper):
                 env.render(mode=data)
         elif cmd == 'get_spaces':
             remote.send(
-                (env.observation_space, env.share_observation_space, env.action_space))
+                (env.obs_space, env.obs_glb_space, env.action_space))
         else:
             raise NotImplementedError
 
@@ -448,9 +448,9 @@ class ChooseSimpleSubprocVecEnv(ShareVecEnv):
         for remote in self.work_remotes:
             remote.close()
         self.remotes[0].send(('get_spaces', None))
-        observation_space, share_observation_space, action_space = self.remotes[0].recv()
-        ShareVecEnv.__init__(self, len(env_fns), observation_space,
-                             share_observation_space, action_space)
+        obs_space, obs_glb_space, action_space = self.remotes[0].recv()
+        ShareVecEnv.__init__(self, len(env_fns), obs_space,
+                             obs_glb_space, action_space)
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
@@ -516,7 +516,7 @@ def chooseworker(remote, parent_remote, env_fn_wrapper):
             remote.send(env.render(mode='rgb_array'))
         elif cmd == 'get_spaces':
             remote.send(
-                (env.observation_space, env.share_observation_space, env.action_space))
+                (env.obs_space, env.obs_glb_space, env.action_space))
         else:
             raise NotImplementedError
 
@@ -538,10 +538,10 @@ class ChooseSubprocVecEnv(ShareVecEnv):
         for remote in self.work_remotes:
             remote.close()
         self.remotes[0].send(('get_spaces', None))
-        observation_space, share_observation_space, action_space = self.remotes[0].recv(
+        obs_space, obs_glb_space, action_space = self.remotes[0].recv(
         )
-        ShareVecEnv.__init__(self, len(env_fns), observation_space,
-                             share_observation_space, action_space)
+        ShareVecEnv.__init__(self, len(env_fns), obs_space,
+                             obs_glb_space, action_space)
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
@@ -551,15 +551,15 @@ class ChooseSubprocVecEnv(ShareVecEnv):
     def step_wait(self):
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
-        obs, share_obs, rews, costs, dones,  available_actions = zip(*results)
-        return np.stack(obs), np.stack(share_obs), np.stack(rews), np.stack(costs), np.stack(dones), np.stack(available_actions)
+        obs, obs_glb, rews, costs, dones,  available_actions = zip(*results)
+        return np.stack(obs), np.stack(obs_glb), np.stack(rews), np.stack(costs), np.stack(dones), np.stack(available_actions)
 
     def reset(self, reset_choose):
         for remote, choose in zip(self.remotes, reset_choose):
             remote.send(('reset', choose))
         results = [remote.recv() for remote in self.remotes]
-        obs, share_obs, available_actions = zip(*results)
-        return np.stack(obs), np.stack(share_obs), np.stack(available_actions)
+        obs, obs_glb, available_actions = zip(*results)
+        return np.stack(obs), np.stack(obs_glb), np.stack(available_actions)
 
     def reset_task(self):
         for remote in self.remotes:
@@ -599,7 +599,7 @@ def chooseguardworker(remote, parent_remote, env_fn_wrapper):
             break
         elif cmd == 'get_spaces':
             remote.send(
-                (env.observation_space, env.share_observation_space, env.action_space))
+                (env.obs_space, env.obs_glb_space, env.action_space))
         else:
             raise NotImplementedError
 
@@ -621,10 +621,10 @@ class ChooseGuardSubprocVecEnv(ShareVecEnv):
         for remote in self.work_remotes:
             remote.close()
         self.remotes[0].send(('get_spaces', None))
-        observation_space, share_observation_space, action_space = self.remotes[0].recv(
+        obs_space, obs_glb_space, action_space = self.remotes[0].recv(
         )
-        ShareVecEnv.__init__(self, len(env_fns), observation_space,
-                             share_observation_space, action_space)
+        ShareVecEnv.__init__(self, len(env_fns), obs_space,
+                             obs_glb_space, action_space)
 
     def step_async(self, actions):
         for remote, action in zip(self.remotes, actions):
@@ -667,7 +667,7 @@ class DummyVecEnv(ShareVecEnv):
         self.envs = [fn() for fn in env_fns]
         env = self.envs[0]
         ShareVecEnv.__init__(self, len(
-            env_fns), env.observation_space, env.share_observation_space, env.action_space)
+            env_fns), env.obs_space, env.obs_glb_space, env.action_space)
         self.actions = None
 
     def step_async(self, actions):
@@ -711,7 +711,7 @@ class ShareDummyVecEnv(ShareVecEnv):
         self.envs = [fn() for fn in env_fns]
         env = self.envs[0]
         ShareVecEnv.__init__(self, len(
-            env_fns), env.observation_space, env.share_observation_space, env.action_space)
+            env_fns), env.obs_space, env.obs_glb_space, env.action_space)
         self.actions = None
 
     def step_async(self, actions):
@@ -719,24 +719,24 @@ class ShareDummyVecEnv(ShareVecEnv):
 
     def step_wait(self):
         results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
-        obs, share_obs, rews, costs, dones, available_actions = map(
+        obs, obs_glb, rews, costs, dones, available_actions = map(
             np.array, zip(*results))
 
         for (i, done) in enumerate(dones):
             if 'bool' in done.__class__.__name__:
                 if done:
-                    obs[i], share_obs[i], available_actions[i] = self.envs[i].reset()
+                    obs[i], obs_glb[i], available_actions[i] = self.envs[i].reset()
             else:
                 if np.all(done):
-                    obs[i], share_obs[i], available_actions[i] = self.envs[i].reset()
+                    obs[i], obs_glb[i], available_actions[i] = self.envs[i].reset()
         self.actions = None
 
-        return obs, share_obs, rews, costs, dones, available_actions
+        return obs, obs_glb, rews, costs, dones, available_actions
 
     def reset(self):
         results = [env.reset() for env in self.envs]
-        obs, share_obs, available_actions = map(np.array, zip(*results))
-        return obs, share_obs, available_actions
+        obs, obs_glb, available_actions = map(np.array, zip(*results))
+        return obs, obs_glb, available_actions
 
     def close(self):
         for env in self.envs:
@@ -757,7 +757,7 @@ class ChooseDummyVecEnv(ShareVecEnv):
         self.envs = [fn() for fn in env_fns]
         env = self.envs[0]
         ShareVecEnv.__init__(self, len(
-            env_fns), env.observation_space, env.share_observation_space, env.action_space)
+            env_fns), env.obs_space, env.obs_glb_space, env.action_space)
         self.actions = None
 
     def step_async(self, actions):
@@ -765,16 +765,16 @@ class ChooseDummyVecEnv(ShareVecEnv):
 
     def step_wait(self):
         results = [env.step(a) for (a, env) in zip(self.actions, self.envs)]
-        obs, share_obs, rews, costs, dones,  available_actions = map(
+        obs, obs_glb, rews, costs, dones,  available_actions = map(
             np.array, zip(*results))
         self.actions = None
-        return obs, share_obs, rews, costs, dones,  available_actions
+        return obs, obs_glb, rews, costs, dones,  available_actions
 
     def reset(self, reset_choose):
         results = [env.reset(choose)
                    for (env, choose) in zip(self.envs, reset_choose)]
-        obs, share_obs, available_actions = map(np.array, zip(*results))
-        return obs, share_obs, available_actions
+        obs, obs_glb, available_actions = map(np.array, zip(*results))
+        return obs, obs_glb, available_actions
 
     def close(self):
         for env in self.envs:
@@ -795,7 +795,7 @@ class ChooseSimpleDummyVecEnv(ShareVecEnv):
         self.envs = [fn() for fn in env_fns]
         env = self.envs[0]
         ShareVecEnv.__init__(self, len(
-            env_fns), env.observation_space, env.share_observation_space, env.action_space)
+            env_fns), env.obs_space, env.obs_glb_space, env.action_space)
         self.actions = None
 
     def step_async(self, actions):
