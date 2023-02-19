@@ -12,6 +12,7 @@ import wandb
 from config import get_config
 from envs.env_wrappers import ShareDummyVecEnv, ShareSubprocVecEnv
 from envs.fdran_env import FdranEnv as Environment
+
 # from envs.mujo_env import MujoEnv as Environment
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"

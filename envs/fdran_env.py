@@ -193,7 +193,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
         lar_idx = pos_new >= self._width
         sma_idx = pos_new < 0
 
-        cost_move = np.sum((pos_new[lar_idx] - self._width) - pos_new[sma_idx])
+        cost_move = (pos_new[lar_idx].sum() - self._width) - pos_new[sma_idx].sum()
 
         pos_new[lar_idx] = self._width - 1e-6
         pos_new[sma_idx] = 0
