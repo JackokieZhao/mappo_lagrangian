@@ -56,24 +56,6 @@ class MujoEnv(object):
         self.init_qpos = self.sim.data.qpos.ravel().copy()
         self.init_qvel = self.sim.data.qvel.ravel().copy()
 
-        # self._set_action_space()
-        self.action_space = spaces.Box(low=np.full(8, -1, dtype=np.float32),
-                                       high=np.full(8, 1, dtype=np.float32))
-        self.obs_space = spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
-                                            np.full(29, -float('inf'), dtype=np.float32))
-        self.obs_glb_space = [Box(low=-10, high=10, shape=(self.obs_glb_size,)) for _ in
-                                        range(self.n_agents)]
-
-        # COMPATIBILITY
-        # self.obs_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
-        #                                      np.full(29, -float('inf'), dtype=np.float32)) for _ in range(self.n_agents)]
-        # self.obs_glb_space = [spaces.Box(np.full(29, -float('inf'), dtype=np.float32),
-        #                                            np.full(29, -float('inf'), dtype=np.float32)) for _ in
-        #                                 range(self.n_agents)]
-        # self.action_space = tuple([spaces.Box(low=np.full(8, -1, dtype=np.float32),
-        #                                       high=np.full(8, 1, dtype=np.float32)) for a in
-        #                            range(self.n_agents)])
-
 
         self.obs_space = [Box(low=-10, high=10, shape=(self.obs_size,)) for _ in range(self.n_agents)]
         self.obs_glb_space = [Box(low=-10, high=10, shape=(self.obs_glb_size,)) for _ in

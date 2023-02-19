@@ -9,6 +9,7 @@
 '''
 
 from collections import OrderedDict
+from turtle import width
 
 import gym
 import mat73 as mat
@@ -23,6 +24,22 @@ from .fd_ran.compute import compute_se_lsfd_mmse
 from .fd_ran.positions import gen_bs_pos
 
 
+class NormalizedActions(gym.ActionWrapper):
+
+    def _action(self, action):
+        action = (action + 1) / 2
+        action *= (self.action_space.high - self.action_space.low)
+        action += self.action_space.low
+        return action
+
+    def action(self, action_):
+        return self._action(action_)
+
+    def _reverse_action(self, action):
+        action -= self.action_space.low
+        action /= (self.action_space.high - self.action_space.low)
+        action = action * 2 - 1
+        return action
 class FdranEnv(gym.Env, utils.EzPickle):
     def __init__(self, configs, sce_idx=1, device='cpu') -> None:
         """__init__: Initi function of the class.
@@ -166,6 +183,9 @@ class FdranEnv(gym.Env, utils.EzPickle):
         rewards = np.ones([self.n_agents, 1]) * self._reward
         costs = np.ones([self.n_agents, 1]) * self._cost
 
+        if self._steps >= self._eps_limit:
+            self.reset()
+            
         return obs, obs_glb, rewards, costs, dones
 
     def check_terminate(self, actions):
@@ -190,13 +210,15 @@ class FdranEnv(gym.Env, utils.EzPickle):
     def _movement(self, actions):
         pos_new = self._bs_pos + actions
 
-        lar_idx = pos_new >= self._width
-        sma_idx = pos_new < 0
+        lar_width = pos_new[pos_new >= self._width]
 
-        cost_move = (pos_new[lar_idx].sum() - self._width) - pos_new[sma_idx].sum()
-
-        pos_new[lar_idx] = self._width - 1e-6
-        pos_new[sma_idx] = 0
+        if len(lar_width) > 0:
+            cost_move = np.abs(pos_new[pos_new < 0].sum()) + (lar_width - self.width).sum()
+            pos_new[pos_new >= self._width] = self._width - 1e-6
+            pos_new[pos_new < 0] = 0
+        else:
+            cost_move = np.abs(pos_new[pos_new < 0].sum())
+            pos_new[pos_new < 0] = 0
 
         return pos_new, cost_move
 
