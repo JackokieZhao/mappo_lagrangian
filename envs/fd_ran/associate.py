@@ -6,7 +6,7 @@ from .compute import compute_se_lsfd_mmse_k
 from .eutils import db2pow
 
 
-def access_pilot(M, K, Gain, tau_p):
+def access_pilot(M, K, Gain, tau_p, gain_thr=40):
     """
     The function takes in the channel gain matrix, the number of users, the number of APs, the number of
     orthogonal pilots, and the threshold for when a non-master AP decides to serve a UE. It then assigns
@@ -23,6 +23,7 @@ def access_pilot(M, K, Gain, tau_p):
     pilots = 1000*torch.ones(K, dtype=torch.int)
     D_C = torch.zeros([M, K], dtype=torch.int)
     masterAPs = torch.zeros(K, dtype=torch.int)
+    master_val = torch.zeros(K, dtype=torch.float64)
     master_count = torch.zeros(M, dtype=torch.int)  # Store the count that the bs served as.
 
     # Set threshold for when a non-master AP decides to serve a UE
@@ -34,12 +35,14 @@ def access_pilot(M, K, Gain, tau_p):
             # channel condition
             master = torch.argmax(Gain[:, k])
 
-            master_count[master] += 1
-
             # If the count is larger than the number of pilots, than it will not serve as master APs for other users.
-            if master_count[master] <= tau_p:
+            if master_count[master] < tau_p:
+
+                master_count[master] += 1
+
                 D_C[master, k] = 1
                 masterAPs[k] = master
+                master_val[k] = Gain[master, k]
 
                 # Assign orthogonal pilots to the first tau_p UEs
                 if k < tau_p:
@@ -63,6 +66,7 @@ def access_pilot(M, K, Gain, tau_p):
                 Gain[master, k] = -1e10
                 continue
 
+    # TODO: =================== BS will serve user with the best signal.========================
     # Each AP serves the UE with the strongest channel condition on each of
     # the pilots where the AP isn't the master AP, but only if its channel
     # is not too weak compared to the master AP
@@ -74,7 +78,7 @@ def access_pilot(M, K, Gain, tau_p):
             # Users with pilot t.
 
             # If the AP is not serve any user with pilot t.
-            if (sum(D_C[m, pilot_ues]) == 0) & (len(pilot_ues) > 0):
+            if (sum(D_C[m, pilot_ues]) == 0) & (len(pilot_ues) > 0) & (D_C[m].sum() < tau_p):
 
                 # np.where the UE with pilot t with the best channel
                 [gainValue, UEindex] = torch.max(Gain[m, pilot_ues], dim=0)
@@ -86,6 +90,12 @@ def access_pilot(M, K, Gain, tau_p):
 
                 if gainValue - gain_b >= threshold:
                     D_C[m, pilot_ues[UEindex]] = 1
+
+    # TODO: ======================== User centric access candidate.============================
+    # ues_idx_sig = torch.argsort(master_val)
+    # for i in range(K):
+    #     k = ues_idx_sig[i]
+    #     pass
 
     return D_C, pilots
 
@@ -116,7 +126,7 @@ def semvs_associate(se_inc_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
     K_m_set = [[] for _ in range(M)]    # Service User set for UBS m.
 
     # Setup a small se, so if adding a new UBS, then 'phi' is large.
-    se_opt = 1e-5 * torch.ones(K)
+    se_opt = 1e-20 * torch.ones(K)
 
     M_C_set = [[] for _ in range(K)]
 
@@ -159,8 +169,8 @@ def semvs_associate(se_inc_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
 
             # INFO: Delete the ubs.
             if len(del_ubs_k) > 0:
-                for i in range(len(del_ubs_k)):
-                    M_C_set[k] = M_C_set[k][M_C_set[k] != del_ubs_k[i]]
+                for j in range(len(del_ubs_k)):
+                    M_C_set[k] = M_C_set[k][M_C_set[k] != del_ubs_k[j]]
                     n_can_ubs[k] = n_can_ubs[k] - 1
 
         # INFO: If there is no candidate ubs.

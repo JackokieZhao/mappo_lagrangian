@@ -11,9 +11,11 @@ import wandb
 
 from config import get_config
 from envs.env_wrappers import ShareDummyVecEnv, ShareSubprocVecEnv
-from envs.fdran_env import FdranEnv as Environment
+from envs.mujo_env import MujoEnv as Environment
+from runner import MujocoRunner as Runner
 
-# from envs.mujo_env import MujoEnv as Environment
+# from envs.fdran_env import FdranEnv as Environment
+
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -109,16 +111,6 @@ def main(args):
         "device": device,
         "run_dir": run_dir
     }
-
-    # TODO: run experiments
-    if configs.share_policy:
-        from runner.shared.mujoco_runner import MujocoRunner as Runner
-    else:
-        # in origin code not implement this method
-        if configs.alg == "mappo_lagr":
-            from runner.mujoco_runner_mappo_lagr import MujocoRunner as Runner
-        else:
-            from runner.mujoco_runner import MujocoRunner as Runner
 
     runner = Runner(config)
     runner.run()

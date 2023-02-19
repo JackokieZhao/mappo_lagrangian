@@ -4,3 +4,7 @@ choose to use cpu...
 obs_glb_space:  [Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,)]
 obs_space:  [Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,), Box(30,)]
 action_space:  [Box(2,), Box(2,), Box(2,), Box(2,), Box(2,), Box(2,), Box(2,), Box(2,), Box(2,), Box(2,)]
+
+ Scenario Ant-v2 Algo mappo_lagr Exp check updates 0/1388 episodes, total num timesteps 7200/10000000.0, FPS 41.
+
+some episodes done, average rewards: 7068.14288187064, average costs: 116.85924371961389

@@ -36,10 +36,6 @@ class ShareVecEnv(ABC):
     closed = False
     viewer = None
 
-    metadata = {
-        'render.modes': ['human', 'rgb_array']
-    }
-
     def __init__(self, num_envs, obs_space, obs_glb_space, action_space):
         self.num_envs = num_envs
         self.obs_space = obs_space
@@ -107,17 +103,6 @@ class ShareVecEnv(ABC):
         self.step_async(actions)
         return self.step_wait()
 
-    def render(self, mode='human'):
-        imgs = self.get_images()
-        bigimg = tile_images(imgs)
-        if mode == 'human':
-            self.get_viewer().imshow(bigimg)
-            return self.get_viewer().isopen
-        elif mode == 'rgb_array':
-            return bigimg
-        else:
-            raise NotImplementedError
-
     def get_images(self):
         """
         Return RGB images from each environment
@@ -130,12 +115,6 @@ class ShareVecEnv(ABC):
             return self.venv.unwrapped
         else:
             return self
-
-    def get_viewer(self):
-        if self.viewer is None:
-            from gym.envs.classic_control import rendering
-            self.viewer = rendering.SimpleImageViewer()
-        return self.viewer
 
 
 def worker(remote, parent_remote, env_fn_wrapper):
@@ -156,12 +135,6 @@ def worker(remote, parent_remote, env_fn_wrapper):
         elif cmd == 'reset':
             ob = env.reset()
             remote.send((ob))
-        elif cmd == 'render':
-            if data == "rgb_array":
-                fr = env.render(mode=data)
-                remote.send(fr)
-            elif data == "human":
-                env.render(mode=data)
         elif cmd == 'reset_task':
             ob = env.reset_task()
             remote.send(ob)
@@ -289,13 +262,6 @@ class SubprocVecEnv(ShareVecEnv):
             p.join()
         self.closed = True
 
-    def render(self, mode="rgb_array"):
-        for remote in self.remotes:
-            remote.send(('render', mode))
-        if mode == "rgb_array":
-            frame = [remote.recv() for remote in self.remotes]
-            return np.stack(frame)
-
 
 def shareworker(remote, parent_remote, env_fn_wrapper):
     parent_remote.close()
@@ -314,12 +280,6 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
         elif cmd == 'reset_task':
             ob = env.reset_task()
             remote.send(ob)
-        elif cmd == 'render':
-            if data == "rgb_array":
-                fr = env.render(mode=data)
-                remote.send(fr)
-            elif data == "human":
-                env.render(mode=data)
         elif cmd == 'close':
             env.close()
             remote.close()
@@ -327,9 +287,6 @@ def shareworker(remote, parent_remote, env_fn_wrapper):
         elif cmd == 'get_spaces':
             remote.send(
                 (env.obs_space, env.obs_glb_space, env.action_space))
-        elif cmd == 'render_vulnerability':
-            fr = env.render_vulnerability(data)
-            remote.send((fr))
         elif cmd == 'get_n_agents':
             remote.send((env.n_agents))
         else:
@@ -418,12 +375,6 @@ def choosesimpleworker(remote, parent_remote, env_fn_wrapper):
             env.close()
             remote.close()
             break
-        elif cmd == 'render':
-            if data == "rgb_array":
-                fr = env.render(mode=data)
-                remote.send(fr)
-            elif data == "human":
-                env.render(mode=data)
         elif cmd == 'get_spaces':
             remote.send(
                 (env.obs_space, env.obs_glb_space, env.action_space))
@@ -469,13 +420,6 @@ class ChooseSimpleSubprocVecEnv(ShareVecEnv):
         obs = [remote.recv() for remote in self.remotes]
         return np.stack(obs)
 
-    def render(self, mode="rgb_array"):
-        for remote in self.remotes:
-            remote.send(('render', mode))
-        if mode == "rgb_array":
-            frame = [remote.recv() for remote in self.remotes]
-            return np.stack(frame)
-
     def reset_task(self):
         for remote in self.remotes:
             remote.send(('reset_task', None))
@@ -512,8 +456,6 @@ def chooseworker(remote, parent_remote, env_fn_wrapper):
             env.close()
             remote.close()
             break
-        elif cmd == 'render':
-            remote.send(env.render(mode='rgb_array'))
         elif cmd == 'get_spaces':
             remote.send(
                 (env.obs_space, env.obs_glb_space, env.action_space))
@@ -696,15 +638,6 @@ class DummyVecEnv(ShareVecEnv):
         for env in self.envs:
             env.close()
 
-    def render(self, mode="human"):
-        if mode == "rgb_array":
-            return np.array([env.render(mode=mode) for env in self.envs])
-        elif mode == "human":
-            for env in self.envs:
-                env.render(mode=mode)
-        else:
-            raise NotImplementedError
-
 
 class ShareDummyVecEnv(ShareVecEnv):
     def __init__(self, env_fns):
@@ -742,15 +675,6 @@ class ShareDummyVecEnv(ShareVecEnv):
         for env in self.envs:
             env.close()
 
-    def render(self, mode="human"):
-        if mode == "rgb_array":
-            return np.array([env.render(mode=mode) for env in self.envs])
-        elif mode == "human":
-            for env in self.envs:
-                env.render(mode=mode)
-        else:
-            raise NotImplementedError
-
 
 class ChooseDummyVecEnv(ShareVecEnv):
     def __init__(self, env_fns):
@@ -780,15 +704,6 @@ class ChooseDummyVecEnv(ShareVecEnv):
         for env in self.envs:
             env.close()
 
-    def render(self, mode="human"):
-        if mode == "rgb_array":
-            return np.array([env.render(mode=mode) for env in self.envs])
-        elif mode == "human":
-            for env in self.envs:
-                env.render(mode=mode)
-        else:
-            raise NotImplementedError
-
 
 class ChooseSimpleDummyVecEnv(ShareVecEnv):
     def __init__(self, env_fns):
@@ -815,12 +730,3 @@ class ChooseSimpleDummyVecEnv(ShareVecEnv):
     def close(self):
         for env in self.envs:
             env.close()
-
-    def render(self, mode="human"):
-        if mode == "rgb_array":
-            return np.array([env.render(mode=mode) for env in self.envs])
-        elif mode == "human":
-            for env in self.envs:
-                env.render(mode=mode)
-        else:
-            raise NotImplementedError

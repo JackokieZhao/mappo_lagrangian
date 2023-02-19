@@ -167,7 +167,7 @@ class MujocoRunner(object):
                               self.num_env_steps,
                               int(total_num_steps / (end - start))))
 
-                # self.log_train(train_infos, total_num_steps)
+                self.log_train(train_infos, total_num_steps)
 
                 if len(done_episodes_rewards) > 0:
                     aver_episode_rewards = np.mean(done_episodes_rewards)
@@ -340,7 +340,7 @@ class MujocoRunner(object):
                 eval_episode_rewards = np.concatenate(eval_episode_rewards)
                 eval_env_infos = {'eval_average_episode_rewards': eval_episode_rewards,
                                   'eval_max_episode_rewards': [np.max(eval_episode_rewards)]}
-                # self.log_env(eval_env_infos, total_num_steps)
+                self.log_env(eval_env_infos, total_num_steps)
                 print("eval_average_episode_rewards is {}.".format(np.mean(eval_episode_rewards)))
                 break
 
