@@ -1,4 +1,14 @@
 #!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@File        :main.py
+@Data        :2023/02/20 10:21:04
+@Version     :1.0
+@Author      :Jackokie
+@Contact     :jackokie@gmail.com
+'''
+
+
 import os
 import socket
 import sys
