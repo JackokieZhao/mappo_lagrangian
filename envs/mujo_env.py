@@ -158,7 +158,7 @@ class MujoEnv(object):
         self.sim.reset()
         qpos = self.init_qpos + self.np_random.uniform(size=self.model.nq, low=-.1, high=.1)
         qpos[-42:] = self.init_qpos[-42:]
-        qvel = self.init_qvel + self.np_random.randn(self.model.nv) * .1
+        qvel = self.init_qvel + self.np_random.normal(size=self.model.nv) * .1
         qvel[-36:] = self.init_qvel[-36:]
 
         assert qpos.shape == (self.model.nq,) and qvel.shape == (self.model.nv,)
