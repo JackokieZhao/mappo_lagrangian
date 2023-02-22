@@ -40,6 +40,8 @@ class NormalizedActions(gym.ActionWrapper):
         action /= (self.action_space.high - self.action_space.low)
         action = action * 2 - 1
         return action
+
+
 class FdranEnv(gym.Env, utils.EzPickle):
     def __init__(self, configs, sce_idx=1, device='cpu') -> None:
         """__init__: Initi function of the class.
@@ -185,7 +187,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
         if self._steps >= self._eps_limit:
             self.reset()
-            
+
         return obs, obs_glb, rewards, costs, dones
 
     def check_terminate(self, actions):
@@ -220,7 +222,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
             cost_move = np.abs(pos_new[pos_new < 0].sum())
             pos_new[pos_new < 0] = 0
 
-        return pos_new, cost_move
+        return pos_new, cost_move * 1e2
 
     def _state_transfer(self, actions):
 
