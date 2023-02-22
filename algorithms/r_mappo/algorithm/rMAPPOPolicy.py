@@ -1,6 +1,7 @@
 import torch
-from mappo_lagrangian.algorithms.r_mappo.algorithm.r_actor_critic import R_Actor, R_Critic
-from mappo_lagrangian.utils.util import update_linear_schedule
+
+from algorithms.r_mappo.algorithm.r_actor_critic import R_Actor, R_Critic
+from utils.util import update_linear_schedule
 
 
 class R_MAPPOPolicy:

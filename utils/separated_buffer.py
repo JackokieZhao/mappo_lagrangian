@@ -3,8 +3,8 @@ from collections import defaultdict
 import numpy as np
 import torch
 
-from mappo_lagrangian.utils.util import (check, get_shape_from_act_space,
-                                         get_shape_from_obs_space)
+from utils.util import (check, get_shape_from_act_space,
+                        get_shape_from_obs_space)
 
 
 def _flatten(T, N, x):

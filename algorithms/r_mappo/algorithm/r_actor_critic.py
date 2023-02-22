@@ -1,11 +1,12 @@
 import torch
 import torch.nn as nn
-from mappo_lagrangian.algorithms.utils.util import init, check
-from mappo_lagrangian.algorithms.utils.cnn import CNNBase
-from mappo_lagrangian.algorithms.utils.mlp import MLPBase
-from mappo_lagrangian.algorithms.utils.rnn import RNNLayer
-from mappo_lagrangian.algorithms.utils.act import ACTLayer
-from mappo_lagrangian.utils.util import get_shape_from_obs_space
+
+from algorithms.utils.act import ACTLayer
+from algorithms.utils.cnn import CNNBase
+from algorithms.utils.mlp import MLPBase
+from algorithms.utils.rnn import RNNLayer
+from algorithms.utils.util import check, init
+from utils.util import get_shape_from_obs_space
 
 
 class R_Actor(nn.Module):

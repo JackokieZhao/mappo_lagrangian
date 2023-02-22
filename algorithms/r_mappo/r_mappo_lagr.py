@@ -1,9 +1,10 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from mappo_lagrangian.utils.util import get_gard_norm, huber_loss, mse_loss
-from mappo_lagrangian.utils.popart import PopArt
-from mappo_lagrangian.algorithms.utils.util import check
+
+from algorithms.utils.util import check
+from utils.popart import PopArt
+from utils.util import get_gard_norm, huber_loss, mse_loss
 
 
 class R_MAPPO_Lagr:

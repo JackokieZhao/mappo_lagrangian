@@ -6,7 +6,7 @@ from multiprocessing import Pipe, Process
 
 import numpy as np
 
-from mappo_lagrangian.utils.util import tile_images
+from utils.util import tile_images
 
 
 class CloudpickleWrapper(object):

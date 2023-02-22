@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from mappo_lagrangian.utils.util import (get_shape_from_act_space,
+from utils.util import (get_shape_from_act_space,
                                          get_shape_from_obs_space)
 
 

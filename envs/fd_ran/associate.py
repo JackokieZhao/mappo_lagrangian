@@ -1,4 +1,6 @@
 
+import time
+
 import numpy as np
 import torch
 
@@ -28,10 +30,13 @@ def access_pilot(M, K, Gain, tau_p, gain_thr=40):
 
     # Set threshold for when a non-master AP decides to serve a UE
     threshold = -40  # dB
-
+    T1 = time.time()
     for k in range(K):
 
         while True:
+            if time.time() - T1 > 10:
+                print("Long time in loop B ..........................")
+
             # channel condition
             master = torch.argmax(Gain[:, k])
 
@@ -96,6 +101,10 @@ def access_pilot(M, K, Gain, tau_p, gain_thr=40):
     # for i in range(K):
     #     k = ues_idx_sig[i]
     #     pass
+    if ~torch.all(D_C.sum(0) > 0):
+        print("error D_C ==============================================================================")
+    if ~torch.all(D_C.sum(1) <= 10):
+        print("error D_C ==============================================================================")
 
     return D_C, pilots
 
@@ -143,11 +152,13 @@ def semvs_associate(se_inc_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
     ue_sort_idx = torch.argsort(n_can_ubs)
     se_inc = torch.zeros([M, K])
 
+    T1 = time.time()
     while True:
-
+        if time.time() - T1 > 10:
+            print("Long time in loop A ..........................")
         # INFO: Iterate every user .
         for i in range(K):
-        
+
             k = ue_sort_idx[i]
             can_ubs_k = M_C_set[k]
             n_can_ubs_k = len(can_ubs_k)
@@ -173,7 +184,7 @@ def semvs_associate(se_inc_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
                     M_C_set[k] = M_C_set[k][M_C_set[k] != del_ubs_k[j]]
                     if n_can_ubs[k] - 1 < 0:
                         opt_se_k, opt_ubs_k, del_ubs_k = choose_ubs(se_inc_thr, k, can_ubs_k, M_k_set[k], se_opt[k],
-                                                        power, D_C, g_stat, g2_stat, F_stat)
+                                                                    power, D_C, g_stat, g2_stat, F_stat)
                     n_can_ubs[k] = n_can_ubs[k] - 1
 
         # INFO: If there is no candidate ubs.
@@ -182,6 +193,11 @@ def semvs_associate(se_inc_thr, M, K, K_T, D_C, g_stat, g2_stat, F_stat, p_max):
 
     for k in range(K):
         D_S[M_k_set[k], k] = 1
+
+    if ~torch.all(D_S.sum(0) > 0):
+        print("error D_C ==============================================================================")
+    if ~torch.all(D_S.sum(1) <= 10):
+        print("error D_C ==============================================================================")
 
     return D_S, se_inc
 
@@ -229,7 +245,8 @@ def choose_ubs(inc_thr, k, can_ubs_set, serve_ubs, cu_se_opt, power, D, g_stat, 
     # If the optimal ubs cannot meet the se incresement threshold.
     if m_opt in del_ubs:
         m_opt = -1
-    elif m_opt != -1:
-        del_ubs.append(m_opt)
+    else:
+        if m_opt != -1:
+            del_ubs.append(m_opt)
 
     return opt_se, m_opt, del_ubs

@@ -183,7 +183,8 @@ class FdranEnv(gym.Env, utils.EzPickle):
         obs = self._get_obs()
         obs_glb = self._get_obs_glb()
         dones = np.ones([self.n_agents]) * self.check_terminate(actions)
-        rewards = np.ones([self.n_agents, 1]) * (self._reward - self._cost)
+        # rewards = np.ones([self.n_agents, 1]) * (self._reward - self._cost)
+        rewards = np.ones([self.n_agents, 1]) * (self._reward)
         costs = np.ones([self.n_agents, 1]) * self._cost
 
         if self._steps >= self._eps_limit:

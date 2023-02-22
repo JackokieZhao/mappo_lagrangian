@@ -20,7 +20,7 @@ from tensorboardX import SummaryWriter
 
 from algorithms.r_mappo.algorithm.MACPPOPolicy import MACPPOPolicy as Policy
 from algorithms.r_mappo.r_mappo_lagr import R_MAPPO_Lagr as Trainalg
-from mappo_lagrangian.utils.separated_buffer import SeparatedReplayBuffer
+from utils.separated_buffer import SeparatedReplayBuffer
 
 
 def _t2n(x):
@@ -168,15 +168,15 @@ class MujocoRunner(object):
             # log information
             if episode % self.log_interval == 0:
                 end = time.time()
-                # print("\n Scenario {} Algo {} Exp {} updates {}/{} episodes, total num timesteps {}/{}, FPS {}.\n"
-                #       .format(self.configs.scenario,
-                #               self.alg,
-                #               self.experiment_name,
-                #               episode,
-                #               episodes,
-                #               total_num_steps,
-                #               self.num_env_steps,
-                #               int(total_num_steps / (end - start))))
+                print("\n Scenario {} Algo {} Exp {} updates {}/{} episodes, total num timesteps {}/{}, FPS {}.\n"
+                      .format(self.configs.scenario,
+                              self.alg,
+                              self.experiment_name,
+                              episode,
+                              episodes,
+                              total_num_steps,
+                              self.num_env_steps,
+                              int(total_num_steps / (end - start))))
 
                 self.log_train(train_infos, total_num_steps)
 
@@ -352,7 +352,7 @@ class MujocoRunner(object):
                 eval_env_infos = {'eval_average_episode_rewards': eval_episode_rewards,
                                   'eval_max_episode_rewards': [np.max(eval_episode_rewards)]}
                 self.log_env(eval_env_infos, total_num_steps)
-                # print("eval_average_episode_rewards is {}.".format(np.mean(eval_episode_rewards)))
+                print("eval_average_episode_rewards is {}.".format(np.mean(eval_episode_rewards)))
                 break
 
     def insert(self, data):
