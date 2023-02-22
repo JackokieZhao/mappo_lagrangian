@@ -75,6 +75,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
         self._p_max = configs.p_max
         self._tau_p = configs.tau_p
         self._se_inc_thr = configs.se_inc_thr
+        self._se_thr = configs.se_thr
 
         # INFO:  load scenario from scriptz
         self._eps_limit = configs.eps_limit
@@ -182,7 +183,7 @@ class FdranEnv(gym.Env, utils.EzPickle):
         obs = self._get_obs()
         obs_glb = self._get_obs_glb()
         dones = np.ones([self.n_agents]) * self.check_terminate(actions)
-        rewards = np.ones([self.n_agents, 1]) * self._reward
+        rewards = np.ones([self.n_agents, 1]) * (self._reward - self._cost)
         costs = np.ones([self.n_agents, 1]) * self._cost
 
         if self._steps >= self._eps_limit:
@@ -247,7 +248,9 @@ class FdranEnv(gym.Env, utils.EzPickle):
 
         # TODO: Cost: ===========================================
         # self._cost = self._ratio * np.sum(np.abs(actions))
-        self._cost = self._ratio * (np.sum(np.abs(actions)) + cost_move)
+        se_cost = (se - self._se_thr)
+        se_cost = np.abs(se_cost[se_cost < 0].sum())
+        self._cost = self._ratio * (np.sum(np.abs(actions)) + cost_move) + 1e1*se_cost
 
     def _env_transfer(self, Gain, R, R_sqrt):
         # candidate ubs and pilot allocation.

@@ -31,7 +31,7 @@ def get_config():
     parser.add_argument("--safety_bound", type=float, default=1, help="constraint upper bound")
 
     # INFO: ===========================================================================
-    parser.add_argument("--n_rollout_threads", type=int, default=36,
+    parser.add_argument("--n_rollout_threads", type=int, default=32,
                         help="Number of parallel envs for training rollouts")
     parser.add_argument("--n_training_threads", type=int,
                         default=1, help="Number of torch threads for training")
@@ -61,7 +61,7 @@ def get_config():
                         default=200, help="The maximum power for users.")
     parser.add_argument("--se_inc_thr", type=float,
                         default=0.01, help="The threshold for se improvement whether surve user.")
-    parser.add_argument("--r_thr", type=float,
+    parser.add_argument("--se_thr", type=float,
                         default=0.5, help="The rate threshold for every user.")
 
     # INFO: ============================= network parameters =============================
